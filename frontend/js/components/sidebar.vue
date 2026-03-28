@@ -1,0 +1,532 @@
+<script setup>
+import { ref, onMounted } from 'vue';
+
+const props = defineProps({
+    currentPage: {
+        type: String,
+        default: 'leader'
+    }
+});
+
+const emit = defineEmits(['navigate']);
+
+const menuItems = ref([
+    { id: 'leader', icon: 'bi-trophy', label: '龙头股筛选' },
+    { id: 'search', icon: 'bi-search', label: '股票查询' },
+    { id: 'portfolio', icon: 'bi-wallet2', label: '自选股' }
+]);
+const showSettingsPanel = ref(false);
+const activeSettingsTab = ref('model');
+const selectedModel = ref('volcengine');
+const modelParams = ref({
+    temperature: 0.7,
+    maxTokens: 1024
+});
+const apiConfigs = ref({
+    volcengine: {
+        apiUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+        apiKey: '',
+        model: 'ep-xxxx-xxxx'
+    },
+    openai: {
+        apiUrl: 'https://api.openai.com/v1',
+        apiKey: '',
+        model: 'gpt-4'
+    },
+    claude: {
+        apiUrl: 'https://api.anthropic.com/v1',
+        apiKey: '',
+        model: 'claude-3-opus-20240229'
+    },
+    gemini: {
+        apiUrl: 'https://generativelanguage.googleapis.com/v1beta',
+        apiKey: '',
+        model: 'gemini-pro'
+    },
+    qwen: {
+        apiUrl: 'https://dashscope.aliyuncs.com/api/v1',
+        apiKey: '',
+        model: 'qwen-turbo'
+    },
+    ernie: {
+        apiUrl: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',
+        apiKey: '',
+        model: 'ernie-bot-4'
+    }
+});
+const showApiKey = ref({});
+const models = ref([
+    {
+        id: 'volcengine',
+        name: '火山引擎',
+        description: '字节跳动旗下的AI服务平台，提供多种大模型',
+        defaultUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+        defaultModel: 'ep-xxxx-xxxx'
+    },
+    {
+        id: 'openai',
+        name: 'OpenAI GPT',
+        description: 'OpenAI的GPT系列模型，包括GPT-3.5和GPT-4',
+        defaultUrl: 'https://api.openai.com/v1',
+        defaultModel: 'gpt-4'
+    },
+    {
+        id: 'claude',
+        name: 'Claude',
+        description: 'Anthropic开发的Claude模型',
+        defaultUrl: 'https://api.anthropic.com/v1',
+        defaultModel: 'claude-3-opus-20240229'
+    },
+    {
+        id: 'gemini',
+        name: 'Gemini',
+        description: 'Google开发的Gemini模型',
+        defaultUrl: 'https://generativelanguage.googleapis.com/v1beta',
+        defaultModel: 'gemini-pro'
+    },
+    {
+        id: 'qwen',
+        name: '通义千问',
+        description: '阿里巴巴开发的通义千问模型',
+        defaultUrl: 'https://dashscope.aliyuncs.com/api/v1',
+        defaultModel: 'qwen-turbo'
+    },
+    {
+        id: 'ernie',
+        name: '文心一言',
+        description: '百度开发的文心一言模型',
+        defaultUrl: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',
+        defaultModel: 'ernie-bot-4'
+    }
+]);
+const settingsTabs = ref([
+        { id: 'model', icon: 'bi-brain', label: '模型设置' },
+        { id: 'data', icon: 'bi-database', label: '数据源' },
+        { id: 'notify', icon: 'bi-bell', label: '通知设置' },
+        { id: 'display', icon: 'bi-palette', label: '显示设置' },
+        { id: 'about', icon: 'bi-info-circle', label: '关于' }
+    ]);
+const dataSettings = ref({
+    autoRefresh: true,
+    refreshInterval: 30,
+    dataSource: 'eastmoney'
+});
+const notifySettings = ref({
+    priceAlert: false,
+    priceThreshold: 5,
+    volumeAlert: false,
+    volumeThreshold: 2,
+    systemNotify: true
+});
+const displaySettings = ref({
+    theme: 'dark',
+    fontSize: 'medium',
+    showKline: true
+});
+
+const getModelIcon = (modelId) => {
+    const icons = {
+        'volcengine': 'bi-lightning-charge',
+        'openai': 'bi-robot',
+        'claude': 'bi-chat-dots',
+        'gemini': 'bi-stars',
+        'qwen': 'bi-cpu',
+        'ernie': 'bi-brain'
+    };
+    return icons[modelId] || 'bi-cpu';
+};
+
+const openSettingsPanel = () => {
+    showSettingsPanel.value = true;
+};
+
+const closeSettingsPanel = () => {
+    showSettingsPanel.value = false;
+};
+
+const selectSettingsTab = (tabId) => {
+    activeSettingsTab.value = tabId;
+};
+
+const selectModel = (modelId) => {
+    selectedModel.value = modelId;
+};
+
+const toggleApiKeyVisibility = (modelId) => {
+    showApiKey.value[modelId] = !showApiKey.value[modelId];
+};
+
+const loadModelSettings = () => {
+    const saved = localStorage.getItem('modelSettings');
+    if (saved) {
+        const settings = JSON.parse(saved);
+        selectedModel.value = settings.model || 'volcengine';
+        modelParams.value = { ...modelParams.value, ...settings.params };
+        if (settings.apiConfigs) {
+            apiConfigs.value = { ...apiConfigs.value, ...settings.apiConfigs };
+        }
+    }
+};
+
+const loadAllSettings = () => {
+    const dataSaved = localStorage.getItem('dataSettings');
+    if (dataSaved) {
+        dataSettings.value = { ...dataSettings.value, ...JSON.parse(dataSaved) };
+    }
+    const notifySaved = localStorage.getItem('notifySettings');
+    if (notifySaved) {
+        notifySettings.value = { ...notifySettings.value, ...JSON.parse(notifySaved) };
+    }
+    const displaySaved = localStorage.getItem('displaySettings');
+    if (displaySaved) {
+        displaySettings.value = { ...displaySettings.value, ...JSON.parse(displaySaved) };
+    }
+};
+
+const saveAllSettings = () => {
+    localStorage.setItem('modelSettings', JSON.stringify({
+        model: selectedModel.value,
+        params: modelParams.value,
+        apiConfigs: apiConfigs.value
+    }));
+    localStorage.setItem('dataSettings', JSON.stringify(dataSettings.value));
+    localStorage.setItem('notifySettings', JSON.stringify(notifySettings.value));
+    localStorage.setItem('displaySettings', JSON.stringify(displaySettings.value));
+    closeSettingsPanel();
+    alert('设置已保存');
+};
+
+onMounted(() => {
+    loadModelSettings();
+    loadAllSettings();
+});
+</script>
+
+<template>
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h4 class="sidebar-title">
+                <i class="bi bi-graph-up-arrow me-2"></i>智能选股
+            </h4>
+        </div>
+        <nav class="sidebar-nav">
+            <a 
+                v-for="item in menuItems" 
+                :key="item.id"
+                class="nav-item"
+                :class="{ active: currentPage === item.id }"
+                @click="$emit('navigate', item.id)"
+            >
+                <i :class="'bi ' + item.icon + ' me-2'"></i>
+                {{ item.label }}
+            </a>
+        </nav>
+        <div class="sidebar-footer">
+            <button 
+                class="btn btn-outline-light w-100" 
+                @click="openSettingsPanel"
+            >
+                <i class="bi bi-gear me-2"></i>设置
+            </button>
+        </div>
+        
+        <!-- 设置页面 -->
+        <div v-if="showSettingsPanel" class="settings-page-overlay" @click.self="closeSettingsPanel">
+            <div class="settings-page">
+                <div class="settings-page-header">
+                    <h3><i class="bi bi-gear me-2"></i>系统设置</h3>
+                    <button class="close-btn" @click="closeSettingsPanel">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                
+                <div class="settings-page-body">
+                    <div class="settings-sidebar">
+                        <a 
+                            v-for="tab in settingsTabs" 
+                            :key="tab.id"
+                            class="settings-tab"
+                            :class="{ active: activeSettingsTab === tab.id }"
+                            @click="selectSettingsTab(tab.id)"
+                        >
+                            <i :class="'bi ' + tab.icon + ' me-2'"></i>
+                            {{ tab.label }}
+                        </a>
+                    </div>
+                    
+                    <div class="settings-content">
+                        <!-- 模型设置 -->
+                        <div v-if="activeSettingsTab === 'model'" class="settings-section">
+                            <h4 class="section-title">AI模型设置</h4>
+                            <div class="model-grid">
+                                <div 
+                                    v-for="model in models" 
+                                    :key="model.id"
+                                    class="model-card"
+                                    :class="{ 'selected': selectedModel === model.id }"
+                                    @click="selectModel(model.id)"
+                                >
+                                    <div class="model-icon">
+                                        <i :class="'bi ' + getModelIcon(model.id)"></i>
+                                    </div>
+                                    <div class="model-info">
+                                        <h6>{{ model.name }}</h6>
+                                        <p>{{ model.description }}</p>
+                                    </div>
+                                    <div class="model-check" v-if="selectedModel === model.id">
+                                        <i class="bi bi-check-circle-fill"></i>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="params-section">
+                                <h5 class="params-title">模型参数</h5>
+                                <div class="param-item">
+                                    <label>温度 (Temperature)</label>
+                                    <div class="param-slider">
+                                        <input 
+                                            type="range" 
+                                            v-model.number="modelParams.temperature" 
+                                            min="0.1" 
+                                            max="1.0" 
+                                            step="0.1"
+                                        >
+                                        <span class="param-value">{{ modelParams.temperature }}</span>
+                                    </div>
+                                    <small class="param-hint">值越低输出越确定，值越高输出越随机</small>
+                                </div>
+                                <div class="param-item">
+                                    <label>最大 Tokens</label>
+                                    <input 
+                                        type="number" 
+                                        v-model.number="modelParams.maxTokens" 
+                                        min="100" 
+                                        max="4096"
+                                    >
+                                    <small class="param-hint">控制生成文本的最大长度</small>
+                                </div>
+                            </div>
+                            
+                            <div class="api-config-section">
+                                <h5 class="params-title">
+                                    <i class="bi bi-key me-2"></i>API 配置
+                                    <span class="config-model-name">({{ models.find(m => m.id === selectedModel)?.name }})</span>
+                                </h5>
+                                <div class="api-config-card">
+                                    <div class="api-config-item">
+                                        <label>
+                                            <i class="bi bi-link-45deg me-1"></i>API 地址
+                                        </label>
+                                        <input 
+                                            type="text" 
+                                            class="form-control"
+                                            v-model="apiConfigs[selectedModel].apiUrl"
+                                            :placeholder="'例如: ' + models.find(m => m.id === selectedModel)?.defaultUrl"
+                                        >
+                                        <small class="param-hint">模型的API服务地址</small>
+                                    </div>
+                                    <div class="api-config-item">
+                                        <label>
+                                            <i class="bi bi-key me-1"></i>API Key
+                                        </label>
+                                        <div class="api-key-input-group">
+                                            <input 
+                                                :type="showApiKey[selectedModel] ? 'text' : 'password'"
+                                                class="form-control"
+                                                v-model="apiConfigs[selectedModel].apiKey"
+                                                placeholder="请输入您的 API Key"
+                                            >
+                                            <button 
+                                                class="btn btn-outline-secondary" 
+                                                type="button"
+                                                @click="toggleApiKeyVisibility(selectedModel)"
+                                            >
+                                                <i :class="showApiKey[selectedModel] ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                                            </button>
+                                        </div>
+                                        <small class="param-hint">您的API密钥，将安全存储在本地</small>
+                                    </div>
+                                    <div class="api-config-item">
+                                        <label>
+                                            <i class="bi bi-cpu me-1"></i>模型名称
+                                        </label>
+                                        <input 
+                                            type="text" 
+                                            class="form-control"
+                                            v-model="apiConfigs[selectedModel].model"
+                                            :placeholder="'例如: ' + models.find(m => m.id === selectedModel)?.defaultModel"
+                                        >
+                                        <small class="param-hint">具体使用的模型版本</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 数据源设置 -->
+                        <div v-if="activeSettingsTab === 'data'" class="settings-section">
+                            <h4 class="section-title">数据源设置</h4>
+                            <div class="setting-item">
+                                <div class="setting-label">
+                                    <i class="bi bi-arrow-repeat me-2"></i>自动刷新
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input 
+                                        type="checkbox" 
+                                        class="form-check-input" 
+                                        v-model="dataSettings.autoRefresh"
+                                    >
+                                </div>
+                            </div>
+                            <div class="setting-item" v-if="dataSettings.autoRefresh">
+                                <div class="setting-label">
+                                    <i class="bi bi-clock me-2"></i>刷新间隔（秒）
+                                </div>
+                                <input 
+                                    type="number" 
+                                    class="form-control setting-input"
+                                    v-model.number="dataSettings.refreshInterval"
+                                    min="10"
+                                    max="300"
+                                >
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-label">
+                                    <i class="bi bi-database me-2"></i>数据源
+                                </div>
+                                <select class="form-select setting-input" v-model="dataSettings.dataSource">
+                                    <option value="eastmoney">东方财富</option>
+                                    <option value="sina">新浪财经</option>
+                                    <option value="tushare">Tushare</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- 通知设置 -->
+                        <div v-if="activeSettingsTab === 'notify'" class="settings-section">
+                            <h4 class="section-title">通知设置</h4>
+                            <div class="setting-item">
+                                <div class="setting-label">
+                                    <i class="bi bi-graph-up me-2"></i>价格预警
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input 
+                                        type="checkbox" 
+                                        class="form-check-input" 
+                                        v-model="notifySettings.priceAlert"
+                                    >
+                                </div>
+                            </div>
+                            <div class="setting-item" v-if="notifySettings.priceAlert">
+                                <div class="setting-label">
+                                    <i class="bi bi-percent me-2"></i>涨跌幅阈值（%）
+                                </div>
+                                <input 
+                                    type="number" 
+                                    class="form-control setting-input"
+                                    v-model.number="notifySettings.priceThreshold"
+                                    min="1"
+                                    max="20"
+                                >
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-label">
+                                    <i class="bi bi-bar-chart me-2"></i>量比预警
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input 
+                                        type="checkbox" 
+                                        class="form-check-input" 
+                                        v-model="notifySettings.volumeAlert"
+                                    >
+                                </div>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-label">
+                                    <i class="bi bi-bell me-2"></i>系统通知
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input 
+                                        type="checkbox" 
+                                        class="form-check-input" 
+                                        v-model="notifySettings.systemNotify"
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 显示设置 -->
+                        <div v-if="activeSettingsTab === 'display'" class="settings-section">
+                            <h4 class="section-title">显示设置</h4>
+                            <div class="setting-item">
+                                <div class="setting-label">
+                                    <i class="bi bi-palette me-2"></i>主题
+                                </div>
+                                <select class="form-select setting-input" v-model="displaySettings.theme">
+                                    <option value="dark">深色模式</option>
+                                    <option value="light">浅色模式</option>
+                                    <option value="auto">跟随系统</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-label">
+                                    <i class="bi bi-type me-2"></i>字体大小
+                                </div>
+                                <select class="form-select setting-input" v-model="displaySettings.fontSize">
+                                    <option value="small">小</option>
+                                    <option value="medium">中</option>
+                                    <option value="large">大</option>
+                                </select>
+                            </div>
+                            <div class="setting-item">
+                                <div class="setting-label">
+                                    <i class="bi bi-graph-up-arrow me-2"></i>显示K线图
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input 
+                                        type="checkbox" 
+                                        class="form-check-input" 
+                                        v-model="displaySettings.showKline"
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 关于 -->
+                        <div v-if="activeSettingsTab === 'about'" class="settings-section">
+                            <h4 class="section-title">关于系统</h4>
+                            <div class="about-content">
+                                <div class="about-logo">
+                                    <i class="bi bi-graph-up-arrow"></i>
+                                </div>
+                                <h3 class="about-title">智能选股系统</h3>
+                                <p class="about-version">版本 1.0.0</p>
+                                <div class="about-info">
+                                    <div class="info-item">
+                                        <i class="bi bi-code-slash me-2"></i>
+                                        <span>基于 Python + Vue 开发</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <i class="bi bi-cpu me-2"></i>
+                                        <span>集成 AI 智能分析</span>
+                                    </div>
+                                    <div class="info-item">
+                                        <i class="bi bi-lightning me-2"></i>
+                                        <span>实时股票数据更新</span>
+                                    </div>
+                                </div>
+                                <p class="about-copyright">© 2026 智能选股系统</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="settings-page-footer">
+                    <button class="btn btn-secondary" @click="closeSettingsPanel">取消</button>
+                    <button class="btn btn-primary" @click="saveAllSettings">
+                        <i class="bi bi-check me-1"></i>保存设置
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
