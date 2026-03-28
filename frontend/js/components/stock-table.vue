@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, onBeforeUnmount } from 'vue';
+import { ref, watch, onBeforeUnmount, nextTick } from 'vue';
 import api from '../api.js';
 
 const props = defineProps({
@@ -51,9 +51,10 @@ const toggleRow = async (stock) => {
             if (data.success) {
                 klineData.value = data.data;
                 console.log('K线数据:', data.data);
-                setTimeout(() => {
+                // 使用requestAnimationFrame确保DOM完全更新
+                requestAnimationFrame(() => {
                     renderKlineChart(stock);
-                }, 100);
+                });
             } else {
                 console.error('获取K线数据失败:', data.error);
             }
@@ -846,7 +847,7 @@ const closeFilterModal = () => {
                                         <div class="spinner"></div>
                                         <p>加载K线数据中...</p>
                                     </div>
-                                    <div v-else-if="klineData" id="kline-{{ stock.code }}" class="kline-chart-container"></div>
+                                    <div v-else-if="klineData" :id="`kline-${stock.code}`" class="kline-chart-container"></div>
                                     <div v-else class="kline-error">
                                         <p>无法加载K线数据</p>
                                     </div>
