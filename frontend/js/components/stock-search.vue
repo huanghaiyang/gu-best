@@ -1,6 +1,5 @@
 <script setup>
 import { ref, watch, onBeforeUnmount } from 'vue';
-import api from '../api.js';
 
 const props = defineProps({
     loading: {

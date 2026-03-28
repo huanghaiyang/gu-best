@@ -1,17 +1,15 @@
-import os
-from dotenv import load_dotenv
+import json
 
-load_dotenv()
+# 读取配置文件
+with open('config.json', 'r', encoding='utf-8') as f:
+    _config = json.load(f)
 
-class Config:
-    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
-    OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
-    OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-4')
-    
-    STOCK_FILTER_CONFIG = {
-        'min_market_cap': 50,
-        'min_volume_ratio': 1.5,
-        'min_turnover_rate': 3.0,
-        'min_rise_days': 3,
-        'top_n_stocks': 10
-    }
+# 导出配置
+db_path = _config['DB_PATH']
+default_ai_config_file = _config['DEFAULT_AI_CONFIG_FILE']
+default_model_id = _config['DEFAULT_MODEL_ID']
+stock_filter_config = _config['STOCK_FILTER_CONFIG']
+
+# 提供一个获取配置的函数
+def get_config():
+    return _config

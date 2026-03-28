@@ -1,0 +1,15 @@
+{
+  "DB_PATH": "data/data.db",
+  "DEFAULT_AI_CONFIG_FILE": "defaultAIConfig.json",
+  "DEFAULT_MODEL_ID": "volcengine",
+  "STOCK_FILTER_CONFIG": {
+    "min_market_cap": 100,
+    "max_market_cap": 10000,
+    "min_price": 5,
+    "max_price": 1000,
+    "min_volume": 1000000,
+    "min_turnover_rate": 3.0,
+    "min_change": 2.0,
+    "top_n_stocks": 20
+  }
+}

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import Sidebar from './components/sidebar.vue';
 import StatsCard from './components/stats-card.vue';
 import SectorTags from './components/sector-tags.vue';
@@ -20,91 +20,6 @@ const modalVisible = ref(false);
 const modalLoading = ref(false);
 const currentStock = ref({});
 const currentAnalysis = ref({});
-const searchQuery = ref('');
-const currentTime = ref('');
-
-const autoRefresh = ref(false);
-const refreshInterval = ref(30);
-let refreshTimer = null;
-
-// 设置相关状态
-const showModelSettings = ref(false);
-const showAbout = ref(false);
-const selectedModel = ref('volcengine');
-const modelParams = ref({
-    temperature: 0.7,
-    maxTokens: 2048
-});
-const apiConfigs = ref({
-    volcengine: {
-        apiUrl: 'https://ark.cn-beijing.volces.com/api/v3/responses',
-        apiKey: '',
-        model: 'doubao-seed-2-0-pro-260215'
-    },
-    openai: {
-        apiUrl: 'https://api.openai.com/v1',
-        apiKey: '',
-        model: 'gpt-4'
-    },
-    claude: {
-        apiUrl: 'https://api.anthropic.com/v1',
-        apiKey: '',
-        model: 'claude-3-opus-20240229'
-    },
-    gemini: {
-        apiUrl: 'https://generativelanguage.googleapis.com/v1beta',
-        apiKey: '',
-        model: 'gemini-pro'
-    },
-    qwen: {
-        apiUrl: 'https://dashscope.aliyuncs.com/api/v1',
-        apiKey: '',
-        model: 'qwen-turbo'
-    },
-    ernie: {
-        apiUrl: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',
-        apiKey: '',
-        secretKey: '',
-        model: 'ernie-bot-4'
-    }
-});
-const models = ref([
-    {
-        id: 'volcengine',
-        name: '火山引擎',
-        description: '字节跳动旗下AI模型，中文理解能力强，响应速度快'
-    },
-    {
-        id: 'gpt4',
-        name: 'GPT-4',
-        description: 'OpenAI最新模型，逻辑推理和创意能力出色'
-    },
-    {
-        id: 'claude',
-        name: 'Claude 3',
-        description: 'Anthropic开发的AI模型，安全可靠，长文本处理能力强'
-    },
-    {
-        id: 'gemini',
-        name: 'Gemini',
-        description: 'Google开发的多模态模型，综合能力强大'
-    },
-    {
-        id: 'llama3',
-        name: 'Llama 3',
-        description: 'Meta开源模型，可本地部署，隐私性好'
-    },
-    {
-        id: 'kimi',
-        name: 'Kimi',
-        description: '深度求索开发的中文模型，知识更新及时'
-    },
-    {
-        id: 'doubao',
-        name: '豆包',
-        description: '字节跳动开发的对话模型，日常交互友好'
-    }
-]);
 
 const indexData = ref({
     sh: { name: '上证指数', code: '000001', price: 0, change: 0, change_pct: 0 },
@@ -197,14 +112,7 @@ const analyzeStock = async (stock) => {
     currentAnalysis.value = {};
 
     try {
-        // 准备模型配置
-        const modelConfig = {
-            model: selectedModel.value,
-            params: modelParams.value,
-            apiConfig: apiConfigs.value[selectedModel.value]
-        };
-        
-        const data = await api.analyzeStock(stock.code, stock.name, stock, modelConfig);
+        const data = await api.analyzeStock(stock.code, stock.name, stock);
         if (data.success) {
             currentAnalysis.value = data.data;
         }
@@ -223,55 +131,6 @@ const navigateTo = (page) => {
     if (page === 'leader') {
         loadSectors();
         loadStocks();
-    }
-};
-
-const toggleAutoRefresh = () => {
-    if (autoRefresh.value) {
-        startAutoRefresh();
-    } else {
-        stopAutoRefresh();
-    }
-};
-
-const startAutoRefresh = () => {
-    stopAutoRefresh();
-    refreshTimer = setInterval(() => {
-        if (currentPage.value === 'leader') {
-            loadStocks();
-            loadIndexData();
-        } else if (currentPage.value === 'search' && searchResults.value.length > 0) {
-            const lastQuery = searchResults.value[0]?.name || '';
-            if (lastQuery) {
-                searchStock(lastQuery);
-            }
-        }
-    }, refreshInterval.value * 1000);
-};
-
-const stopAutoRefresh = () => {
-    if (refreshTimer) {
-        clearInterval(refreshTimer);
-        refreshTimer = null;
-    }
-};
-
-const updateRefreshInterval = () => {
-    if (autoRefresh.value) {
-        startAutoRefresh();
-    }
-};
-
-const refreshAll = () => {
-    if (currentPage.value === 'leader') {
-        loadSectors();
-        loadStocks();
-        loadIndexData();
-    } else if (currentPage.value === 'search' && searchResults.value.length > 0) {
-        const lastQuery = searchResults.value[0]?.name || '';
-        if (lastQuery) {
-            searchStock(lastQuery);
-        }
     }
 };
 
@@ -330,54 +189,10 @@ const refreshStockPrices = async () => {
     }
 };
 
-const updateTime = () => {
-    currentTime.value = new Date().toLocaleString('zh-CN');
-};
-
-// 模型设置方法
-const loadModelSettings = async () => {
-    try {
-        const response = await api.getSetting('modelSettings');
-        if (response.success && response.data) {
-            const settings = response.data;
-            selectedModel.value = settings.model || 'volcengine';
-            modelParams.value = { ...modelParams.value, ...settings.params };
-            if (settings.apiConfigs) {
-                apiConfigs.value = { ...apiConfigs.value, ...settings.apiConfigs };
-            }
-        }
-    } catch (error) {
-        console.error('加载模型设置失败:', error);
-    }
-};
-
-const saveModelSettings = async () => {
-    try {
-        const settings = {
-            model: selectedModel.value,
-            params: modelParams.value,
-            apiConfigs: apiConfigs.value
-        };
-        await api.setSetting('modelSettings', settings);
-        showModelSettings.value = false;
-        alert('模型设置已保存');
-    } catch (error) {
-        console.error('保存模型设置失败:', error);
-        alert('保存模型设置失败，请稍后重试');
-    }
-};
-
-onMounted(async () => {
+onMounted(() => {
     loadIndexData();
     loadSectors();
     loadStocks();
-    updateTime();
-    await loadModelSettings();
-    setInterval(updateTime, 1000);
-});
-
-onUnmounted(() => {
-    stopAutoRefresh();
 });
 </script>
 
@@ -386,141 +201,6 @@ onUnmounted(() => {
         <sidebar :current-page="currentPage" @navigate="navigateTo"></sidebar>
         
         <div class="main-content">
-            <!-- 模型设置弹窗 -->
-            <div v-if="showModelSettings" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-                <div class="modal-dialog modal-lg">
-                    <div class="modal-content bg-dark text-white">
-                        <div class="modal-header">
-                            <h5 class="modal-title">
-                                <i class="bi bi-brain me-2"></i>AI模型设置
-                            </h5>
-                            <button type="button" class="btn-close btn-close-white" @click="showModelSettings = false"></button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="mb-4">
-                                <label class="form-label fw-bold">选择AI模型</label>
-                                <div class="list-group">
-                                    <div 
-                                        v-for="model in models" 
-                                        :key="model.id"
-                                        class="list-group-item bg-dark text-white border border-gray-700 cursor-pointer"
-                                        :class="{ 'active': selectedModel === model.id }"
-                                        @click="selectedModel = model.id"
-                                    >
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <h6 class="mb-1">{{ model.name }}</h6>
-                                                <p class="text-muted text-sm">{{ model.description }}</p>
-                                            </div>
-                                            <input 
-                                                type="radio" 
-                                                :name="'model'" 
-                                                :checked="selectedModel === model.id"
-                                                @change="selectedModel = model.id"
-                                            >
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mb-4">
-                                <label class="form-label fw-bold">模型参数</label>
-                                <div class="row">
-                                    <div class="col-md-6">
-                                        <label class="form-label">温度 (Temperature)</label>
-                                        <input 
-                                            type="range" 
-                                            v-model.number="modelParams.temperature" 
-                                            class="form-range"
-                                            min="0.1" 
-                                            max="1.0" 
-                                            step="0.1"
-                                        >
-                                        <small class="text-muted">{{ modelParams.temperature }}</small>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label">最大 tokens</label>
-                                        <input 
-                                            type="number" 
-                                            v-model.number="modelParams.maxTokens" 
-                                            class="form-control bg-gray-800 border-gray-700 text-white"
-                                            min="100" 
-                                            max="4096"
-                                        >
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="mb-4">
-                                <label class="form-label fw-bold">API配置</label>
-                                <div class="mb-3">
-                                    <label class="form-label">API地址</label>
-                                    <input 
-                                        type="text" 
-                                        v-model="apiConfigs[selectedModel].apiUrl" 
-                                        class="form-control bg-gray-800 border-gray-700 text-white"
-                                        placeholder="请输入API地址"
-                                    >
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">API Key</label>
-                                    <input 
-                                        type="password" 
-                                        v-model="apiConfigs[selectedModel].apiKey" 
-                                        class="form-control bg-gray-800 border-gray-700 text-white"
-                                        placeholder="请输入API Key"
-                                    >
-                                </div>
-                                <div class="mb-3" v-if="selectedModel === 'ernie'">
-                                    <label class="form-label">Secret Key</label>
-                                    <input 
-                                        type="password" 
-                                        v-model="apiConfigs[selectedModel].secretKey" 
-                                        class="form-control bg-gray-800 border-gray-700 text-white"
-                                        placeholder="请输入Secret Key"
-                                    >
-                                </div>
-                                <div class="mb-3">
-                                    <label class="form-label">模型名称</label>
-                                    <input 
-                                        type="text" 
-                                        v-model="apiConfigs[selectedModel].model" 
-                                        class="form-control bg-gray-800 border-gray-700 text-white"
-                                        placeholder="请输入模型名称"
-                                    >
-                                </div>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" @click="showModelSettings = false">取消</button>
-                            <button type="button" class="btn btn-primary" @click="saveModelSettings">保存设置</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- 关于弹窗 -->
-            <div v-if="showAbout" class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
-                <div class="modal-dialog">
-                    <div class="modal-content bg-dark text-white">
-                        <div class="modal-header">
-                            <h5 class="modal-title">
-                                <i class="bi bi-info-circle me-2"></i>关于系统
-                            </h5>
-                            <button type="button" class="btn-close btn-close-white" @click="showAbout = false"></button>
-                        </div>
-                        <div class="modal-body">
-                            <p class="mb-2">智能选股系统 v1.0.0</p>
-                            <p class="mb-2">基于Node.js + Vue + Python开发</p>
-                            <p class="mb-2">提供实时股票分析和AI预测</p>
-                            <p class="text-muted">© 2026 智能选股系统</p>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-primary" @click="showAbout = false">确定</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
             <div class="content-wrapper">
                 <div v-if="currentPage === 'leader'" class="index-bar mb-3">
                     <div class="row">

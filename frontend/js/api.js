@@ -35,28 +35,24 @@ const api = {
         return response.json();
     },
 
-    async analyzeStock(stockCode, stockName, stockData, modelConfig = null) {
+    async analyzeStock(stockCode, stockName, stockData) {
         const response = await fetch(`${API_BASE}/stocks/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 stock_code: stockCode,
                 stock_name: stockName,
-                stock_data: stockData,
-                model_config: modelConfig
+                stock_data: stockData
             })
         });
         return response.json();
     },
 
-    async batchAnalyzeStocks(stocks, modelConfig = null) {
+    async batchAnalyzeStocks(stocks) {
         const response = await fetch(`${API_BASE}/stocks/batch-analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-                stocks,
-                model_config: modelConfig
-            })
+            body: JSON.stringify({ stocks })
         });
         return response.json();
     },
@@ -136,6 +132,60 @@ const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(testData)
         });
+        return response.json();
+    },
+
+    // AI设置相关API
+    async getAISettings() {
+        const response = await fetch(`${API_BASE}/ai/settings`);
+        return response.json();
+    },
+
+    async getAISetting(modelId) {
+        const response = await fetch(`${API_BASE}/ai/settings/${modelId}`);
+        return response.json();
+    },
+
+    async getActiveAISetting() {
+        const response = await fetch(`${API_BASE}/ai/settings/active`);
+        return response.json();
+    },
+
+    async addAISetting(settingData) {
+        const response = await fetch(`${API_BASE}/ai/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settingData)
+        });
+        return response.json();
+    },
+
+    async updateAISetting(modelId, settingData) {
+        const response = await fetch(`${API_BASE}/ai/settings/${modelId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(settingData)
+        });
+        return response.json();
+    },
+
+    async setActiveAIModel(modelId) {
+        const response = await fetch(`${API_BASE}/ai/settings/active/${modelId}`, {
+            method: 'PUT'
+        });
+        return response.json();
+    },
+
+    async deleteAISetting(modelId) {
+        const response = await fetch(`${API_BASE}/ai/settings/${modelId}`, {
+            method: 'DELETE'
+        });
+        return response.json();
+    },
+
+    // 获取AI模型列表
+    async getAIModels() {
+        const response = await fetch(`${API_BASE}/ai/models`);
         return response.json();
     }
 };

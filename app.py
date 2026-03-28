@@ -3,8 +3,7 @@ from flask_cors import CORS
 from services.stock_service import StockService
 from services.ai_service import AIService
 from services.database_service import DatabaseService
-from config import Config
-import os
+from config import stock_filter_config
 
 app = Flask(__name__, static_folder='frontend', static_url_path='')
 CORS(app)
@@ -73,7 +72,7 @@ def get_kline_data():
 def get_leader_stocks():
     try:
         sector = request.args.get('sector', None)
-        top_n = int(request.args.get('top_n', Config.STOCK_FILTER_CONFIG['top_n_stocks']))
+        top_n = int(request.args.get('top_n', stock_filter_config['top_n_stocks']))
         
         leaders = stock_service.screen_leader_stocks(sector=sector, top_n=top_n)
         return jsonify({'success': True, 'data': leaders})
@@ -87,17 +86,24 @@ def analyze_stock():
         stock_code = data.get('stock_code')
         stock_name = data.get('stock_name')
         stock_data = data.get('stock_data', {})
-        model_config = data.get('model_config', {})
         
         if not stock_code:
             return jsonify({'success': False, 'error': '缺少股票代码'}), 400
         
-        # 设置模型配置
-        if model_config:
+        # 从数据库获取当前激活的AI模型配置
+        active_setting = db_service.get_active_ai_setting()
+        if active_setting:
             ai_service.set_model_config(
-                model_config.get('model'),
-                model_config.get('apiConfig'),
-                model_config.get('params')
+                active_setting['modelId'],
+                {
+                    'apiUrl': active_setting['apiUrl'],
+                    'apiKey': active_setting['apiKey'],
+                    'model': active_setting['modelName']
+                },
+                {
+                    'temperature': active_setting['temperature'],
+                    'maxTokens': active_setting['maxTokens']
+                }
             )
         
         analysis = ai_service.analyze_stock(stock_code, stock_name, stock_data)
@@ -110,17 +116,24 @@ def batch_analyze_stocks():
     try:
         data = request.get_json()
         stocks = data.get('stocks', [])
-        model_config = data.get('model_config', {})
         
         if not stocks:
             return jsonify({'success': False, 'error': '缺少股票数据'}), 400
         
-        # 设置模型配置
-        if model_config:
+        # 从数据库获取当前激活的AI模型配置
+        active_setting = db_service.get_active_ai_setting()
+        if active_setting:
             ai_service.set_model_config(
-                model_config.get('model'),
-                model_config.get('apiConfig'),
-                model_config.get('params')
+                active_setting['modelId'],
+                {
+                    'apiUrl': active_setting['apiUrl'],
+                    'apiKey': active_setting['apiKey'],
+                    'model': active_setting['modelName']
+                },
+                {
+                    'temperature': active_setting['temperature'],
+                    'maxTokens': active_setting['maxTokens']
+                }
             )
         
         results = ai_service.batch_analyze_stocks(stocks)
@@ -226,6 +239,123 @@ def test_model():
         # 测试模型连接
         result = ai_service.test_model(model, params, api_config)
         return jsonify({'success': True, 'data': result})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# AI设置相关API
+@app.route('/api/ai/settings', methods=['GET'])
+def get_ai_settings():
+    try:
+        ai_settings = db_service.get_all_ai_settings()
+        return jsonify({'success': True, 'data': ai_settings})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ai/settings/<model_id>', methods=['GET'])
+def get_ai_setting(model_id):
+    try:
+        ai_setting = db_service.get_ai_setting(model_id)
+        if ai_setting:
+            return jsonify({'success': True, 'data': ai_setting})
+        else:
+            return jsonify({'success': False, 'error': '未找到指定的AI模型配置'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ai/settings/active', methods=['GET'])
+def get_active_ai_setting():
+    try:
+        ai_setting = db_service.get_active_ai_setting()
+        if ai_setting:
+            return jsonify({'success': True, 'data': ai_setting})
+        else:
+            return jsonify({'success': False, 'error': '未找到激活的AI模型配置'}), 404
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ai/settings', methods=['POST'])
+def add_ai_setting():
+    try:
+        data = request.get_json()
+        model_id = data.get('modelId')
+        model_name = data.get('modelName')
+        api_url = data.get('apiUrl')
+        api_key = data.get('apiKey')
+        secret_key = data.get('secretKey')
+        temperature = data.get('temperature', 0.7)
+        max_tokens = data.get('maxTokens', 2048)
+        is_active = data.get('isActive', 0)
+        
+        if not model_id or not model_name or not api_url:
+            return jsonify({'success': False, 'error': '缺少必要的参数'}), 400
+        
+        success = db_service.add_ai_setting(
+            model_id, model_name, api_url, api_key, 
+            secret_key, temperature, max_tokens, is_active
+        )
+        return jsonify({'success': success})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ai/settings/<model_id>', methods=['PUT'])
+def update_ai_setting(model_id):
+    try:
+        data = request.get_json()
+        
+        success = db_service.update_ai_setting(
+            model_id=model_id,
+            model_name=data.get('modelName'),
+            api_url=data.get('apiUrl'),
+            api_key=data.get('apiKey'),
+            secret_key=data.get('secretKey'),
+            temperature=data.get('temperature'),
+            max_tokens=data.get('maxTokens'),
+            is_active=data.get('isActive')
+        )
+        return jsonify({'success': success})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ai/settings/active/<model_id>', methods=['PUT'])
+def set_active_ai_model(model_id):
+    try:
+        success = db_service.set_active_ai_model(model_id)
+        return jsonify({'success': success})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/ai/settings/<model_id>', methods=['DELETE'])
+def delete_ai_setting(model_id):
+    try:
+        success = db_service.delete_ai_setting(model_id)
+        return jsonify({'success': success})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# 获取AI模型列表
+@app.route('/api/ai/models', methods=['GET'])
+def get_ai_models():
+    try:
+        # 从数据库中读取所有AI模型配置
+        db_settings = db_service.get_all_ai_settings()
+        
+        # 转换为前端需要的格式
+        models = []
+        for setting in db_settings:
+            model = {
+                'id': setting['modelId'],
+                'name': setting['modelName'],
+                'apiUrl': setting['apiUrl'],
+                'apiKey': setting['apiKey'],
+                'secretKey': setting['secretKey'],
+                'model': setting['modelName'],  # 前端需要的字段
+                'temperature': setting['temperature'],
+                'maxTokens': setting['maxTokens'],
+                'isActive': setting['isActive']
+            }
+            models.append(model)
+        
+        return jsonify({'success': True, 'data': models})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

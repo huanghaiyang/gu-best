@@ -1,6 +1,4 @@
-from typing import List, Dict, Optional
-from config import Config
-import json
+from typing import List, Dict
 import requests
 
 class AIService:

@@ -1,47 +1,11 @@
 import sqlite3
 import json
 from typing import Optional, List, Dict, Any
+from config import db_path
 
 class DatabaseService:
-    def __init__(self, db_path: str = 'data.db'):
+    def __init__(self, db_path: str = db_path):
         self.db_path = db_path
-        self._init_db()
-    
-    def _init_db(self):
-        """初始化数据库"""
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            
-            # 创建设置表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS settings (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    key TEXT UNIQUE NOT NULL,
-                    value TEXT NOT NULL
-                )
-            ''')
-            
-            # 创建自选股表
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS watchlist (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    code TEXT UNIQUE NOT NULL,
-                    name TEXT NOT NULL,
-                    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            # 创建用户表（如果需要）
-            cursor.execute('''
-                CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    username TEXT UNIQUE NOT NULL,
-                    password TEXT NOT NULL,
-                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                )
-            ''')
-            
-            conn.commit()
     
     def get_setting(self, key: str) -> Optional[Any]:
         """获取设置"""
@@ -50,7 +14,10 @@ class DatabaseService:
             cursor.execute('SELECT value FROM settings WHERE key = ?', (key,))
             result = cursor.fetchone()
             if result:
-                return json.loads(result[0])
+                try:
+                    return json.loads(result[0])
+                except json.JSONDecodeError:
+                    return result[0]
             return None
     
     def set_setting(self, key: str, value: Any) -> bool:
@@ -76,7 +43,10 @@ class DatabaseService:
             results = cursor.fetchall()
             settings = {}
             for key, value in results:
-                settings[key] = json.loads(value)
+                try:
+                    settings[key] = json.loads(value)
+                except json.JSONDecodeError:
+                    settings[key] = value
             return settings
     
     def add_to_watchlist(self, code: str, name: str) -> bool:
@@ -135,5 +105,174 @@ class DatabaseService:
     
     def close(self):
         """关闭数据库连接"""
-        # SQLite3的连接在with语句结束后会自动关闭
         pass
+    
+    def add_ai_setting(self, model_id: str, model_name: str, api_url: str, 
+                     api_key: str = None, secret_key: str = None, 
+                     temperature: float = 0.7, max_tokens: int = 2048, 
+                     is_active: int = 0) -> bool:
+        """添加AI模型配置"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('''
+                    INSERT OR REPLACE INTO ai_settings 
+                    (modelId, modelName, apiUrl, apiKey, secretKey, temperature, maxTokens, isActive, updatedAt)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ''', (model_id, model_name, api_url, api_key, secret_key, temperature, max_tokens, is_active))
+                conn.commit()
+                return True
+            except Exception as e:
+                print(f"添加AI设置失败: {e}")
+                return False
+    
+    def update_ai_setting(self, model_id: str, model_name: str = None, api_url: str = None,
+                       api_key: str = None, secret_key: str = None,
+                       temperature: float = None, max_tokens: int = None,
+                       is_active: int = None) -> bool:
+        """更新AI模型配置"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                update_fields = []
+                update_values = []
+                
+                if model_name is not None:
+                    update_fields.append('modelName = ?')
+                    update_values.append(model_name)
+                if api_url is not None:
+                    update_fields.append('apiUrl = ?')
+                    update_values.append(api_url)
+                if api_key is not None:
+                    update_fields.append('apiKey = ?')
+                    update_values.append(api_key)
+                if secret_key is not None:
+                    update_fields.append('secretKey = ?')
+                    update_values.append(secret_key)
+                if temperature is not None:
+                    update_fields.append('temperature = ?')
+                    update_values.append(temperature)
+                if max_tokens is not None:
+                    update_fields.append('maxTokens = ?')
+                    update_values.append(max_tokens)
+                if is_active is not None:
+                    update_fields.append('isActive = ?')
+                    update_values.append(is_active)
+                
+                if update_fields:
+                    update_fields.append('updatedAt = CURRENT_TIMESTAMP')
+                    update_values.append(model_id)
+                    
+                    cursor.execute(f'''
+                        UPDATE ai_settings 
+                        SET {', '.join(update_fields)}
+                        WHERE modelId = ?
+                    ''', update_values)
+                    conn.commit()
+                    return True
+                return False
+            except Exception as e:
+                print(f"更新AI设置失败: {e}")
+                return False
+    
+    def get_ai_setting(self, model_id: str) -> Optional[Dict[str, Any]]:
+        """获取指定AI模型配置"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT modelId, modelName, apiUrl, apiKey, secretKey, temperature, maxTokens, isActive, createdAt, updatedAt
+                FROM ai_settings 
+                WHERE modelId = ?
+            ''', (model_id,))
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'modelId': result[0],
+                    'modelName': result[1],
+                    'apiUrl': result[2],
+                    'apiKey': result[3],
+                    'secretKey': result[4],
+                    'temperature': result[5],
+                    'maxTokens': result[6],
+                    'isActive': result[7],
+                    'createdAt': result[8],
+                    'updatedAt': result[9]
+                }
+            return None
+    
+    def get_all_ai_settings(self) -> List[Dict[str, Any]]:
+        """获取所有AI模型配置"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT modelId, modelName, apiUrl, apiKey, secretKey, temperature, maxTokens, isActive, createdAt, updatedAt
+                FROM ai_settings 
+                ORDER BY createdAt DESC
+            ''')
+            results = cursor.fetchall()
+            ai_settings = []
+            for result in results:
+                ai_settings.append({
+                    'modelId': result[0],
+                    'modelName': result[1],
+                    'apiUrl': result[2],
+                    'apiKey': result[3],
+                    'secretKey': result[4],
+                    'temperature': result[5],
+                    'maxTokens': result[6],
+                    'isActive': result[7],
+                    'createdAt': result[8],
+                    'updatedAt': result[9]
+                })
+            return ai_settings
+    
+    def get_active_ai_setting(self) -> Optional[Dict[str, Any]]:
+        """获取当前激活的AI模型配置"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute('''
+                SELECT modelId, modelName, apiUrl, apiKey, secretKey, temperature, maxTokens, isActive, createdAt, updatedAt
+                FROM ai_settings 
+                WHERE isActive = 1
+                LIMIT 1
+            ''')
+            result = cursor.fetchone()
+            if result:
+                return {
+                    'modelId': result[0],
+                    'modelName': result[1],
+                    'apiUrl': result[2],
+                    'apiKey': result[3],
+                    'secretKey': result[4],
+                    'temperature': result[5],
+                    'maxTokens': result[6],
+                    'isActive': result[7],
+                    'createdAt': result[8],
+                    'updatedAt': result[9]
+                }
+            return None
+    
+    def set_active_ai_model(self, model_id: str) -> bool:
+        """设置激活的AI模型"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('UPDATE ai_settings SET isActive = 0')
+                cursor.execute('UPDATE ai_settings SET isActive = 1 WHERE modelId = ?', (model_id,))
+                conn.commit()
+                return True
+            except Exception as e:
+                print(f"设置激活AI模型失败: {e}")
+                return False
+    
+    def delete_ai_setting(self, model_id: str) -> bool:
+        """删除AI模型配置"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute('DELETE FROM ai_settings WHERE modelId = ?', (model_id,))
+                conn.commit()
+                return True
+            except Exception as e:
+                print(f"删除AI设置失败: {e}")
+                return False

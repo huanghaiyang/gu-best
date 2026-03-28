@@ -1,0 +1,54 @@
+{
+  "models": [
+    {
+      "id": "volcengine",
+      "name": "火山引擎",
+      "description": "字节跳动旗下的AI服务平台，提供多种大模型",
+      "apiUrl": "https://ark.cn-beijing.volces.com/api/v3/responses",
+      "apiKey": "",
+      "model": "doubao-seed-2-0-pro-260215"
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI GPT",
+      "description": "OpenAI的GPT系列模型，包括GPT-3.5和GPT-4",
+      "apiUrl": "https://api.openai.com/v1",
+      "apiKey": "",
+      "model": "gpt-4"
+    },
+    {
+      "id": "claude",
+      "name": "Claude",
+      "description": "Anthropic开发的Claude模型",
+      "apiUrl": "https://api.anthropic.com/v1",
+      "apiKey": "",
+      "model": "claude-3-opus-20240229"
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "description": "Google开发的Gemini模型",
+      "apiUrl": "https://generativelanguage.googleapis.com/v1beta",
+      "apiKey": "",
+      "model": "gemini-pro"
+    },
+    {
+      "id": "qwen",
+      "name": "通义千问",
+      "description": "阿里巴巴开发的通义千问模型",
+      "apiUrl": "https://dashscope.aliyuncs.com/api/v1",
+      "apiKey": "",
+      "model": "qwen-turbo"
+    },
+    {
+      "id": "ernie",
+      "name": "文心一言",
+      "description": "百度开发的文心一言模型",
+      "apiUrl": "https://aip.baidubce.com/rpc/2.0/ai_custom/v1",
+      "apiKey": "",
+      "secretKey": "",
+      "model": "ernie-bot-4"
+    }
+  ],
+  "defaultModel": "volcengine"
+}

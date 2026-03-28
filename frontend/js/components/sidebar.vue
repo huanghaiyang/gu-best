@@ -1,5 +1,6 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import _ from 'lodash';
 import api from '../api.js';
 
 const props = defineProps({
@@ -19,92 +20,30 @@ const menuItems = ref([
 const showSettingsPanel = ref(false);
 const activeSettingsTab = ref('model');
 const selectedModel = ref('volcengine');
-const modelParams = ref({
-    temperature: 0.7,
-    maxTokens: 1024
-});
-const apiConfigs = ref({
-    volcengine: {
-        apiUrl: 'https://ark.cn-beijing.volces.com/api/v3/responses',
-        apiKey: '',
-        model: 'doubao-seed-2-0-pro-260215'
-    },
-    openai: {
-        apiUrl: 'https://api.openai.com/v1',
-        apiKey: '',
-        model: 'gpt-4'
-    },
-    claude: {
-        apiUrl: 'https://api.anthropic.com/v1',
-        apiKey: '',
-        model: 'claude-3-opus-20240229'
-    },
-    gemini: {
-        apiUrl: 'https://generativelanguage.googleapis.com/v1beta',
-        apiKey: '',
-        model: 'gemini-pro'
-    },
-    qwen: {
-        apiUrl: 'https://dashscope.aliyuncs.com/api/v1',
-        apiKey: '',
-        model: 'qwen-turbo'
-    },
-    ernie: {
-        apiUrl: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',
-        apiKey: '',
-        model: 'ernie-bot-4'
-    }
-});
+const DEFAULT_TEMPERATURE = 0.7;
+const DEFAULT_MODEL_TOKENS = 1024;
+const DEFAULT_MODEL_CONFIG = {
+    apiUrl: '',
+    apiKey: '',
+    secretKey: '',
+    model: '',
+    temperature: DEFAULT_TEMPERATURE,
+    maxTokens: DEFAULT_MODEL_TOKENS
+};
+
+// 统一的模型配置对象，包含API配置和模型参数
+const modelConfigs = ref({});
 const showApiKey = ref({});
+
+// 修改跟踪标记
+const isModelChanged = ref(false);
+const isModelConfigChanged = ref(false);
 
 // 模型测试相关状态
 const testModelLoading = ref(false);
 const testModelResult = ref(null);
 const testModelError = ref(null);
-const models = ref([
-    {
-        id: 'volcengine',
-        name: '火山引擎',
-        description: '字节跳动旗下的AI服务平台，提供多种大模型',
-        defaultUrl: 'https://ark.cn-beijing.volces.com/api/v3',
-        defaultModel: 'ep-xxxx-xxxx'
-    },
-    {
-        id: 'openai',
-        name: 'OpenAI GPT',
-        description: 'OpenAI的GPT系列模型，包括GPT-3.5和GPT-4',
-        defaultUrl: 'https://api.openai.com/v1',
-        defaultModel: 'gpt-4'
-    },
-    {
-        id: 'claude',
-        name: 'Claude',
-        description: 'Anthropic开发的Claude模型',
-        defaultUrl: 'https://api.anthropic.com/v1',
-        defaultModel: 'claude-3-opus-20240229'
-    },
-    {
-        id: 'gemini',
-        name: 'Gemini',
-        description: 'Google开发的Gemini模型',
-        defaultUrl: 'https://generativelanguage.googleapis.com/v1beta',
-        defaultModel: 'gemini-pro'
-    },
-    {
-        id: 'qwen',
-        name: '通义千问',
-        description: '阿里巴巴开发的通义千问模型',
-        defaultUrl: 'https://dashscope.aliyuncs.com/api/v1',
-        defaultModel: 'qwen-turbo'
-    },
-    {
-        id: 'ernie',
-        name: '文心一言',
-        description: '百度开发的文心一言模型',
-        defaultUrl: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',
-        defaultModel: 'ernie-bot-4'
-    }
-]);
+const models = ref([]);
 const settingsTabs = ref([
         { id: 'model', icon: 'bi-brain', label: '模型设置' },
         { id: 'data', icon: 'bi-database', label: '数据源' },
@@ -142,8 +81,32 @@ const getModelIcon = (modelId) => {
     return icons[modelId] || 'bi-cpu';
 };
 
-const openSettingsPanel = () => {
+const openSettingsPanel = async () => {
     showSettingsPanel.value = true;
+
+    // 重置修改标记
+    isModelChanged.value = false;
+    isModelConfigChanged.value = false;
+
+    // 加载当前激活的模型数据
+    try {
+        const response = await api.getActiveAISetting();
+        if (response.success && response.data) {
+            const activeModel = response.data;
+            selectedModel.value = activeModel.modelId;
+            // 后端返回的字段已经是驼峰形式，直接使用
+            modelConfigs.value[activeModel.modelId] = {
+                apiUrl: activeModel.apiUrl || '',
+                apiKey: activeModel.apiKey || '',
+                secretKey: activeModel.secretKey || '',
+                model: activeModel.modelName || '',
+                temperature: activeModel.temperature || DEFAULT_TEMPERATURE,
+                maxTokens: activeModel.maxTokens || DEFAULT_MODEL_TOKENS
+            };
+        }
+    } catch (error) {
+        console.error('加载激活模型配置失败:', error);
+    }
 };
 
 const closeSettingsPanel = () => {
@@ -154,13 +117,55 @@ const selectSettingsTab = (tabId) => {
     activeSettingsTab.value = tabId;
 };
 
-const selectModel = (modelId) => {
+const selectModel = async (modelId) => {
     selectedModel.value = modelId;
+    isModelChanged.value = true; // 标记模型已切换
+
+    // 从后端获取该模型的配置
+    try {
+        const response = await api.getAISetting(modelId);
+        if (response.success && response.data) {
+            const data = response.data;
+            // 后端返回的字段已经是驼峰形式，直接使用
+            modelConfigs.value[modelId] = {
+                apiUrl: data.apiUrl || '',
+                apiKey: data.apiKey || '',
+                secretKey: data.secretKey || '',
+                model: data.modelName || '',
+                temperature: data.temperature || DEFAULT_TEMPERATURE,
+                maxTokens: data.maxTokens || DEFAULT_MODEL_TOKENS
+            };
+        } else {
+            // 如果后端没有该模型的配置，初始化空配置
+            if (!modelConfigs.value[modelId]) {
+                modelConfigs.value[modelId] = _.cloneDeep(DEFAULT_MODEL_CONFIG);
+            }
+        }
+    } catch (error) {
+        console.error('加载模型配置失败:', error);
+        // 确保配置对象存在
+        if (!modelConfigs.value[modelId]) {
+            modelConfigs.value[modelId] = _.cloneDeep(DEFAULT_MODEL_CONFIG);
+        }
+    }
 };
 
 const toggleApiKeyVisibility = (modelId) => {
     showApiKey.value[modelId] = !showApiKey.value[modelId];
 };
+
+// 确保模型配置对象存在
+const ensureModelConfig = (modelId) => {
+    if (!modelConfigs.value[modelId]) {
+        modelConfigs.value[modelId] = _.cloneDeep(DEFAULT_MODEL_CONFIG);
+    }
+    return modelConfigs.value[modelId];
+};
+
+// 计算属性：获取当前模型配置
+const currentModelConfig = computed(() => {
+    return ensureModelConfig(selectedModel.value);
+});
 
 // 模型测试方法
 const testModel = async () => {
@@ -168,12 +173,11 @@ const testModel = async () => {
         testModelLoading.value = true;
         testModelResult.value = null;
         testModelError.value = null;
-        
-        // 获取当前模型配置
-        const config = apiConfigs.value[selectedModel.value];
+
+        const modelConfig = ensureModelConfig(selectedModel.value);
         
         // 验证配置
-        if (!config.apiUrl || !config.apiKey || !config.model) {
+        if (!modelConfig.apiUrl || !modelConfig.apiKey || !modelConfig.model) {
             testModelError.value = '请填写完整的API配置';
             testModelLoading.value = false;
             return;
@@ -182,8 +186,16 @@ const testModel = async () => {
         // 准备测试数据
         const testData = {
             model: selectedModel.value,
-            params: modelParams.value,
-            apiConfig: config
+            params: {
+                temperature: modelConfig.temperature,
+                maxTokens: modelConfig.maxTokens
+            },
+            apiConfig: {
+                apiUrl: modelConfig.apiUrl,
+                apiKey: modelConfig.apiKey,
+                secretKey: modelConfig.secretKey,
+                model: modelConfig.model
+            }
         };
         
         // 调用API测试模型
@@ -203,14 +215,51 @@ const testModel = async () => {
 
 const loadModelSettings = async () => {
     try {
-        const response = await api.getSetting('modelSettings');
-        if (response.success && response.data) {
-            const settings = response.data;
-            selectedModel.value = settings.model || 'volcengine';
-            modelParams.value = { ...modelParams.value, ...settings.params };
-            if (settings.apiConfigs) {
-                apiConfigs.value = { ...apiConfigs.value, ...settings.apiConfigs };
+        // 加载所有AI模型配置（从ai_settings表）
+        const allSettingsResponse = await api.getAISettings();
+        if (allSettingsResponse.success && allSettingsResponse.data) {
+            const allSettings = allSettingsResponse.data;
+            // 遍历所有模型配置并更新
+            allSettings.forEach(setting => {
+                // 后端返回的字段已经是驼峰形式，直接使用
+                modelConfigs.value[setting.modelId] = {
+                    apiUrl: setting.apiUrl || '',
+                    apiKey: setting.apiKey || '',
+                    secretKey: setting.secretKey || '',
+                    model: setting.modelName || '',
+                    temperature: setting.temperature || DEFAULT_TEMPERATURE,
+                    maxTokens: setting.maxTokens || DEFAULT_MODEL_TOKENS
+                };
+            });
+        }
+
+        // 加载当前激活的模型配置
+        const activeResponse = await api.getActiveAISetting();
+        if (activeResponse.success && activeResponse.data) {
+            const activeModel = activeResponse.data;
+            selectedModel.value = activeModel.modelId || 'volcengine';
+            // 后端返回的字段已经是驼峰形式，直接使用
+            if (!modelConfigs.value[activeModel.modelId]) {
+                modelConfigs.value[activeModel.modelId] = {
+                    apiUrl: activeModel.apiUrl || '',
+                    apiKey: activeModel.apiKey || '',
+                    secretKey: activeModel.secretKey || '',
+                    model: activeModel.modelName || '',
+                    temperature: activeModel.temperature || DEFAULT_TEMPERATURE,
+                    maxTokens: activeModel.maxTokens || DEFAULT_MODEL_TOKENS
+                };
             }
+        }
+
+        // 加载模型列表
+        const modelsResponse = await api.getAIModels();
+        if (modelsResponse.success && modelsResponse.data) {
+            models.value = modelsResponse.data;
+        }
+
+        // 确保当前选中模型的配置对象存在
+        if (!modelConfigs.value[selectedModel.value]) {
+            modelConfigs.value[selectedModel.value] = _.cloneDeep(DEFAULT_MODEL_CONFIG);
         }
     } catch (error) {
         console.error('加载模型设置失败:', error);
@@ -239,14 +288,40 @@ const loadAllSettings = async () => {
 
 const saveAllSettings = async () => {
     try {
-        await api.setSetting('modelSettings', {
-            model: selectedModel.value,
-            params: modelParams.value,
-            apiConfigs: apiConfigs.value
-        });
-        await api.setSetting('dataSettings', dataSettings.value);
-        await api.setSetting('notifySettings', notifySettings.value);
-        await api.setSetting('displaySettings', displaySettings.value);
+        const promises = [];
+
+        // 1. 如果切换了激活模型，更新settings表中的currentAiModel和ai_settings表的激活状态
+        if (isModelChanged.value) {
+            promises.push(api.setSetting('currentAiModel', selectedModel.value));
+            promises.push(api.setActiveAIModel(selectedModel.value));
+        }
+
+        // 2. 如果模型配置有修改，更新ai_settings表
+        if (isModelConfigChanged.value) {
+            const currentConfig = ensureModelConfig(selectedModel.value);
+            const updateData = {
+                apiUrl: currentConfig.apiUrl,
+                apiKey: currentConfig.apiKey,
+                secretKey: currentConfig.secretKey,
+                modelName: currentConfig.model,
+                temperature: currentConfig.temperature,
+                maxTokens: currentConfig.maxTokens
+            };
+            promises.push(api.updateAISetting(selectedModel.value, updateData));
+        }
+
+        // 4. 其他设置（dataSettings, notifySettings, displaySettings）
+        // 这些设置改动较少，每次保存时都更新
+        promises.push(api.setSetting('dataSettings', dataSettings.value));
+        promises.push(api.setSetting('notifySettings', notifySettings.value));
+        promises.push(api.setSetting('displaySettings', displaySettings.value));
+
+        await Promise.all(promises);
+
+        // 重置修改标记
+        isModelChanged.value = false;
+        isModelConfigChanged.value = false;
+
         closeSettingsPanel();
         alert('设置已保存');
     } catch (error) {
@@ -343,25 +418,27 @@ onMounted(async () => {
                                 <div class="param-item">
                                     <label>温度 (Temperature)</label>
                                     <div class="param-slider">
-                                        <input 
-                                            type="range" 
-                                            v-model.number="modelParams.temperature" 
-                                            min="0.1" 
-                                            max="1.0" 
+                                        <input
+                                            type="range"
+                                            v-model.number="currentModelConfig.temperature"
+                                            min="0.1"
+                                            max="1.0"
                                             step="0.1"
+                                            @change="isModelConfigChanged = true"
                                         >
-                                        <span class="param-value">{{ modelParams.temperature }}</span>
+                                        <span class="param-value">{{ currentModelConfig.temperature }}</span>
                                     </div>
                                     <small class="param-hint">值越低输出越确定，值越高输出越随机</small>
                                 </div>
                                 <div class="param-item">
                                     <label>最大 Tokens</label>
-                                    <input 
-                                        type="number" 
-                                        v-model.number="modelParams.maxTokens" 
-                                        min="100" 
-                                        max="4096"
-                                    >
+                                    <input
+                                            type="number"
+                                            v-model.number="currentModelConfig.maxTokens"
+                                            min="100"
+                                            max="4096"
+                                            @change="isModelConfigChanged = true"
+                                        >
                                     <small class="param-hint">控制生成文本的最大长度</small>
                                 </div>
                             </div>
@@ -376,11 +453,12 @@ onMounted(async () => {
                                         <label>
                                             <i class="bi bi-link-45deg me-1"></i>API 地址
                                         </label>
-                                        <input 
-                                            type="text" 
+                                        <input
+                                            type="text"
                                             class="form-control"
-                                            v-model="apiConfigs[selectedModel].apiUrl"
+                                            v-model="currentModelConfig.apiUrl"
                                             :placeholder="'例如: ' + models.find(m => m.id === selectedModel)?.defaultUrl"
+                                            @change="isModelConfigChanged = true"
                                         >
                                         <small class="param-hint">模型的API服务地址</small>
                                     </div>
@@ -389,14 +467,15 @@ onMounted(async () => {
                                             <i class="bi bi-key me-1"></i>API Key
                                         </label>
                                         <div class="api-key-input-group">
-                                            <input 
+                                            <input
                                                 :type="showApiKey[selectedModel] ? 'text' : 'password'"
                                                 class="form-control"
-                                                v-model="apiConfigs[selectedModel].apiKey"
+                                                v-model="currentModelConfig.apiKey"
                                                 placeholder="请输入您的 API Key"
+                                                @change="isModelConfigChanged = true"
                                             >
-                                            <button 
-                                                class="btn btn-outline-secondary" 
+                                            <button
+                                                class="btn btn-outline-secondary"
                                                 type="button"
                                                 @click="toggleApiKeyVisibility(selectedModel)"
                                             >
@@ -409,13 +488,36 @@ onMounted(async () => {
                                         <label>
                                             <i class="bi bi-cpu me-1"></i>模型名称
                                         </label>
-                                        <input 
-                                            type="text" 
-                                            class="form-control"
-                                            v-model="apiConfigs[selectedModel].model"
-                                            :placeholder="'例如: ' + models.find(m => m.id === selectedModel)?.defaultModel"
-                                        >
+                                        <input
+                                                type="text"
+                                                class="form-control"
+                                                v-model="currentModelConfig.model"
+                                                :placeholder="'例如: ' + models.find(m => m.id === selectedModel)?.defaultModel"
+                                                @change="isModelConfigChanged = true"
+                                            >
                                         <small class="param-hint">具体使用的模型版本</small>
+                                    </div>
+                                    <div class="api-config-item">
+                                        <label>
+                                            <i class="bi bi-shield-lock me-1"></i>Secret Key (可选)
+                                        </label>
+                                        <div class="api-key-input-group">
+                                            <input
+                                                :type="showApiKey[selectedModel] ? 'text' : 'password'"
+                                                class="form-control"
+                                                v-model="currentModelConfig.secretKey"
+                                                placeholder="请输入您的 Secret Key (如果需要)"
+                                                @change="isModelConfigChanged = true"
+                                            >
+                                            <button
+                                                class="btn btn-outline-secondary"
+                                                type="button"
+                                                @click="toggleApiKeyVisibility(selectedModel)"
+                                            >
+                                                <i :class="showApiKey[selectedModel] ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                                            </button>
+                                        </div>
+                                        <small class="param-hint">某些模型需要额外的 Secret Key</small>
                                     </div>
                                 </div>
                             </div>

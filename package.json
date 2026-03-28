@@ -3,16 +3,21 @@
   "version": "1.0.0",
   "description": "股票分析平台 - Python后端 + Vue前端",
   "scripts": {
-    "dev": "concurrently \"npm run python:dev\" \"npm run client:dev\"",
+    "dev": "npm run db:check && concurrently \"npm run python:dev\" \"npm run client:dev\"",
     "python:dev": "python app.py",
-    "python:prod": "python app.py",
+    "python:prod": "npm run db:check && python app.py",
     "client:dev": "vite",
     "client:build": "vite build",
     "client:preview": "vite preview",
     "build": "npm run client:build",
     "start": "npm run python:prod",
     "lint": "eslint . --ext .js,.vue",
-    "lint:fix": "eslint . --ext .js,.vue --fix"
+    "lint:fix": "eslint . --ext .js,.vue --fix",
+    "db:clear": "python scripts/db_manage.py clear",
+    "db:init": "python scripts/db_manage.py init",
+    "db:reset": "python scripts/db_manage.py reset",
+    "db:dump": "python scripts/db_manage.py dump",
+    "db:check": "python scripts/db_manage.py check"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.5.2",
@@ -30,5 +35,8 @@
     "python"
   ],
   "author": "",
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "lodash": "^4.17.23"
+  }
 }

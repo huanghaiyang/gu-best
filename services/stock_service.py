@@ -1,8 +1,8 @@
 import math
 from typing import List, Dict, Optional
 from datetime import datetime, timedelta
-from config import Config
 import requests
+from config import stock_filter_config
 
 HAS_AKSHARE = False
 try:
@@ -69,7 +69,7 @@ def get_sector_category(sector_name: str) -> str:
 
 class StockService:
     def __init__(self):
-        self.config = Config.STOCK_FILTER_CONFIG
+        self.config = stock_filter_config
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',

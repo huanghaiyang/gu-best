@@ -4,26 +4,7 @@ import vue from '@vitejs/plugin-vue';
 
 export default defineConfig({
   plugins: [
-    vue(),
-    {
-      name: 'serve-js-as-static',
-      configureServer(server) {
-        // 拦截.js文件请求，直接返回静态文件
-        server.middlewares.use((req, res, next) => {
-          if (req.url.startsWith('/js/') && req.url.endsWith('.js')) {
-            const fs = require('fs');
-            const filePath = path.join(__dirname, 'frontend', req.url);
-            if (fs.existsSync(filePath)) {
-              const content = fs.readFileSync(filePath, 'utf8');
-              res.setHeader('Content-Type', 'application/javascript');
-              res.end(content);
-              return;
-            }
-          }
-          next();
-        });
-      }
-    }
+    vue()
   ],
   
   // 项目根目录
