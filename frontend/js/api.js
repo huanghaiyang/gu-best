@@ -35,24 +35,28 @@ const api = {
         return response.json();
     },
 
-    async analyzeStock(stockCode, stockName, stockData) {
+    async analyzeStock(stockCode, stockName, stockData, modelConfig = null) {
         const response = await fetch(`${API_BASE}/stocks/analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 stock_code: stockCode,
                 stock_name: stockName,
-                stock_data: stockData
+                stock_data: stockData,
+                model_config: modelConfig
             })
         });
         return response.json();
     },
 
-    async batchAnalyzeStocks(stocks) {
+    async batchAnalyzeStocks(stocks, modelConfig = null) {
         const response = await fetch(`${API_BASE}/stocks/batch-analyze`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ stocks })
+            body: JSON.stringify({ 
+                stocks,
+                model_config: modelConfig
+            })
         });
         return response.json();
     },
@@ -75,6 +79,64 @@ const api = {
                 }
             };
         }
+    },
+
+    // 数据库相关API
+    async getSettings() {
+        const response = await fetch(`${API_BASE}/db/settings`);
+        return response.json();
+    },
+
+    async getSetting(key) {
+        const response = await fetch(`${API_BASE}/db/settings/${key}`);
+        return response.json();
+    },
+
+    async setSetting(key, value) {
+        const response = await fetch(`${API_BASE}/db/settings`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ key, value })
+        });
+        return response.json();
+    },
+
+    async getWatchlist() {
+        const response = await fetch(`${API_BASE}/db/watchlist`);
+        return response.json();
+    },
+
+    async addToWatchlist(code, name) {
+        const response = await fetch(`${API_BASE}/db/watchlist`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, name })
+        });
+        return response.json();
+    },
+
+    async removeFromWatchlist(code) {
+        const response = await fetch(`${API_BASE}/db/watchlist/${code}`, {
+            method: 'DELETE'
+        });
+        return response.json();
+    },
+
+    async clearWatchlist() {
+        const response = await fetch(`${API_BASE}/db/watchlist`, {
+            method: 'DELETE'
+        });
+        return response.json();
+    },
+
+    // 模型测试API
+    async testModel(testData) {
+        const response = await fetch(`${API_BASE}/ai/test-model`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(testData)
+        });
+        return response.json();
     }
 };
 

@@ -1,5 +1,6 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
+import api from '../api.js';
 
 const props = defineProps({
     currentPage: {
@@ -24,9 +25,9 @@ const modelParams = ref({
 });
 const apiConfigs = ref({
     volcengine: {
-        apiUrl: 'https://ark.cn-beijing.volces.com/api/v3',
+        apiUrl: 'https://ark.cn-beijing.volces.com/api/v3/responses',
         apiKey: '',
-        model: 'ep-xxxx-xxxx'
+        model: 'doubao-seed-2-0-pro-260215'
     },
     openai: {
         apiUrl: 'https://api.openai.com/v1',
@@ -55,6 +56,11 @@ const apiConfigs = ref({
     }
 });
 const showApiKey = ref({});
+
+// 模型测试相关状态
+const testModelLoading = ref(false);
+const testModelResult = ref(null);
+const testModelError = ref(null);
 const models = ref([
     {
         id: 'volcengine',
@@ -156,49 +162,102 @@ const toggleApiKeyVisibility = (modelId) => {
     showApiKey.value[modelId] = !showApiKey.value[modelId];
 };
 
-const loadModelSettings = () => {
-    const saved = localStorage.getItem('modelSettings');
-    if (saved) {
-        const settings = JSON.parse(saved);
-        selectedModel.value = settings.model || 'volcengine';
-        modelParams.value = { ...modelParams.value, ...settings.params };
-        if (settings.apiConfigs) {
-            apiConfigs.value = { ...apiConfigs.value, ...settings.apiConfigs };
+// 模型测试方法
+const testModel = async () => {
+    try {
+        testModelLoading.value = true;
+        testModelResult.value = null;
+        testModelError.value = null;
+        
+        // 获取当前模型配置
+        const config = apiConfigs.value[selectedModel.value];
+        
+        // 验证配置
+        if (!config.apiUrl || !config.apiKey || !config.model) {
+            testModelError.value = '请填写完整的API配置';
+            testModelLoading.value = false;
+            return;
         }
+        
+        // 准备测试数据
+        const testData = {
+            model: selectedModel.value,
+            params: modelParams.value,
+            apiConfig: config
+        };
+        
+        // 调用API测试模型
+        const response = await api.testModel(testData);
+        
+        if (response.success) {
+            testModelResult.value = response.data;
+        } else {
+            testModelError.value = response.error || '测试失败，请检查参数配置';
+        }
+    } catch (error) {
+        testModelError.value = `测试失败: ${error.message}`;
+    } finally {
+        testModelLoading.value = false;
     }
 };
 
-const loadAllSettings = () => {
-    const dataSaved = localStorage.getItem('dataSettings');
-    if (dataSaved) {
-        dataSettings.value = { ...dataSettings.value, ...JSON.parse(dataSaved) };
-    }
-    const notifySaved = localStorage.getItem('notifySettings');
-    if (notifySaved) {
-        notifySettings.value = { ...notifySettings.value, ...JSON.parse(notifySaved) };
-    }
-    const displaySaved = localStorage.getItem('displaySettings');
-    if (displaySaved) {
-        displaySettings.value = { ...displaySettings.value, ...JSON.parse(displaySaved) };
+const loadModelSettings = async () => {
+    try {
+        const response = await api.getSetting('modelSettings');
+        if (response.success && response.data) {
+            const settings = response.data;
+            selectedModel.value = settings.model || 'volcengine';
+            modelParams.value = { ...modelParams.value, ...settings.params };
+            if (settings.apiConfigs) {
+                apiConfigs.value = { ...apiConfigs.value, ...settings.apiConfigs };
+            }
+        }
+    } catch (error) {
+        console.error('加载模型设置失败:', error);
     }
 };
 
-const saveAllSettings = () => {
-    localStorage.setItem('modelSettings', JSON.stringify({
-        model: selectedModel.value,
-        params: modelParams.value,
-        apiConfigs: apiConfigs.value
-    }));
-    localStorage.setItem('dataSettings', JSON.stringify(dataSettings.value));
-    localStorage.setItem('notifySettings', JSON.stringify(notifySettings.value));
-    localStorage.setItem('displaySettings', JSON.stringify(displaySettings.value));
-    closeSettingsPanel();
-    alert('设置已保存');
+const loadAllSettings = async () => {
+    try {
+        const response = await api.getSettings();
+        if (response.success && response.data) {
+            const settings = response.data;
+            if (settings.dataSettings) {
+                dataSettings.value = { ...dataSettings.value, ...settings.dataSettings };
+            }
+            if (settings.notifySettings) {
+                notifySettings.value = { ...notifySettings.value, ...settings.notifySettings };
+            }
+            if (settings.displaySettings) {
+                displaySettings.value = { ...displaySettings.value, ...settings.displaySettings };
+            }
+        }
+    } catch (error) {
+        console.error('加载设置失败:', error);
+    }
 };
 
-onMounted(() => {
-    loadModelSettings();
-    loadAllSettings();
+const saveAllSettings = async () => {
+    try {
+        await api.setSetting('modelSettings', {
+            model: selectedModel.value,
+            params: modelParams.value,
+            apiConfigs: apiConfigs.value
+        });
+        await api.setSetting('dataSettings', dataSettings.value);
+        await api.setSetting('notifySettings', notifySettings.value);
+        await api.setSetting('displaySettings', displaySettings.value);
+        closeSettingsPanel();
+        alert('设置已保存');
+    } catch (error) {
+        console.error('保存设置失败:', error);
+        alert('保存设置失败，请稍后重试');
+    }
+};
+
+onMounted(async () => {
+    await loadModelSettings();
+    await loadAllSettings();
 });
 </script>
 
@@ -357,6 +416,48 @@ onMounted(() => {
                                             :placeholder="'例如: ' + models.find(m => m.id === selectedModel)?.defaultModel"
                                         >
                                         <small class="param-hint">具体使用的模型版本</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- 模型测试 -->
+                            <div class="model-test-section">
+                                <h5 class="params-title">
+                                    <i class="bi bi-play-circle me-2"></i>模型测试
+                                </h5>
+                                <div class="model-test-card">
+                                    <p class="test-hint">点击下方按钮测试模型配置是否正确</p>
+                                    <button 
+                                        class="btn btn-primary w-100" 
+                                        @click="testModel"
+                                        :disabled="testModelLoading"
+                                    >
+                                        <i v-if="testModelLoading" class="bi bi-spinner bi-spin me-2"></i>
+                                        <span>{{ testModelLoading ? '测试中...' : '测试模型' }}</span>
+                                    </button>
+                                    
+                                    <!-- 测试结果 -->
+                                    <div v-if="testModelResult" class="test-result success">
+                                        <div class="test-result-header">
+                                            <i class="bi bi-check-circle-fill"></i>
+                                            <h6>测试成功</h6>
+                                        </div>
+                                        <div class="test-result-content">
+                                            <p>模型配置正确，可以正常使用</p>
+                                            <div class="test-result-detail">
+                                                <pre>{{ JSON.stringify(testModelResult, null, 2) }}</pre>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div v-if="testModelError" class="test-result error">
+                                        <div class="test-result-header">
+                                            <i class="bi bi-exclamation-circle-fill"></i>
+                                            <h6>测试失败</h6>
+                                        </div>
+                                        <div class="test-result-content">
+                                            <p>{{ testModelError }}</p>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -530,3 +631,88 @@ onMounted(() => {
         </div>
     </div>
 </template>
+
+<style scoped>
+/* 模型测试 */
+.model-test-section {
+    margin-bottom: 30px;
+}
+
+.model-test-card {
+    background-color: #2a2a3f;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.test-hint {
+    margin-bottom: 15px;
+    color: #b0b0b0;
+    font-size: 14px;
+}
+
+.model-test-card button {
+    margin-bottom: 20px;
+}
+
+.test-result {
+    margin-top: 20px;
+    padding: 15px;
+    border-radius: 6px;
+}
+
+.test-result.success {
+    background-color: rgba(16, 185, 129, 0.1);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.test-result.error {
+    background-color: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.test-result-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.test-result-header i {
+    font-size: 18px;
+    margin-right: 10px;
+}
+
+.test-result.success .test-result-header i {
+    color: #10b981;
+}
+
+.test-result.error .test-result-header i {
+    color: #ef4444;
+}
+
+.test-result-header h6 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.test-result-content p {
+    margin: 0 0 10px 0;
+    color: #e0e0e0;
+}
+
+.test-result-detail {
+    background-color: #1e1e2f;
+    border-radius: 4px;
+    padding: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.test-result-detail pre {
+    margin: 0;
+    font-size: 12px;
+    color: #a78bfa;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+</style>

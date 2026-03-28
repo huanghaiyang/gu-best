@@ -1,45 +1,180 @@
 from typing import List, Dict, Optional
 from config import Config
 import json
-
-try:
-    from openai import OpenAI
-    HAS_OPENAI = True
-except ImportError:
-    HAS_OPENAI = False
-    print("警告: openai未安装，将使用模拟AI分析模式")
+import requests
 
 class AIService:
     def __init__(self):
-        self.client = None
-        if HAS_OPENAI and Config.OPENAI_API_KEY:
-            try:
-                self.client = OpenAI(
-                    api_key=Config.OPENAI_API_KEY,
-                    base_url=Config.OPENAI_BASE_URL
+        self.model = None
+        self.api_config = None
+        self.params = None
+    
+    def set_model_config(self, model_type, api_config, params):
+        """设置模型配置"""
+        self.model = model_type
+        self.api_config = api_config
+        self.params = params
+    
+    def _make_chat_request(self, messages, temperature=0.7, max_tokens=1000):
+        """统一的REST API请求方法"""
+        try:
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            
+            # 根据不同的模型设置请求头和请求体
+            if self.model == 'openai':
+                headers['Authorization'] = f"Bearer {self.api_config.get('apiKey')}"
+                data = {
+                    'model': self.api_config.get('model'),
+                    'messages': messages,
+                    'temperature': temperature,
+                    'max_tokens': max_tokens
+                }
+                response = requests.post(
+                    f"{self.api_config.get('apiUrl')}/chat/completions",
+                    json=data,
+                    headers=headers,
+                    timeout=30
                 )
-            except Exception as e:
-                print(f"初始化OpenAI客户端失败: {e}")
-        self.model = Config.OPENAI_MODEL
+                
+            elif self.model == 'claude':
+                headers['x-api-key'] = self.api_config.get('apiKey')
+                headers['anthropic-version'] = '2023-06-01'
+                data = {
+                    'model': self.api_config.get('model'),
+                    'max_tokens': max_tokens,
+                    'temperature': temperature,
+                    'messages': messages
+                }
+                response = requests.post(
+                    f"{self.api_config.get('apiUrl')}/messages",
+                    json=data,
+                    headers=headers,
+                    timeout=30
+                )
+                
+            elif self.model == 'gemini':
+                headers['Authorization'] = f"Bearer {self.api_config.get('apiKey')}"
+                # Gemini的API格式不同，需要转换消息格式
+                prompt = '\n'.join([msg['content'] for msg in messages])
+                data = {
+                    'contents': [{'parts': [{'text': prompt}]}],
+                    'generationConfig': {
+                        'temperature': temperature,
+                        'maxOutputTokens': max_tokens
+                    }
+                }
+                response = requests.post(
+                    f"{self.api_config.get('apiUrl')}/models/{self.api_config.get('model')}:generateContent",
+                    json=data,
+                    headers=headers,
+                    timeout=30
+                )
+                
+            elif self.model == 'qwen':
+                headers['Authorization'] = f"Bearer {self.api_config.get('apiKey')}"
+                data = {
+                    'model': self.api_config.get('model'),
+                    'input': {
+                        'messages': messages
+                    },
+                    'parameters': {
+                        'temperature': temperature,
+                        'max_tokens': max_tokens
+                    }
+                }
+                response = requests.post(
+                    self.api_config.get('apiUrl'),
+                    json=data,
+                    headers=headers,
+                    timeout=30
+                )
+                
+            elif self.model == 'ernie':
+                # 文心一言需要access_token
+                headers['Content-Type'] = 'application/json'
+                data = {
+                    'messages': messages,
+                    'temperature': temperature,
+                    'max_output_tokens': max_tokens
+                }
+                # 文心一言需要先获取access_token
+                token_url = f"https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id={self.api_config.get('apiKey')}&client_secret={self.api_config.get('secretKey', '')}"
+                token_response = requests.post(token_url, timeout=10)
+                if token_response.status_code == 200:
+                    access_token = token_response.json().get('access_token')
+                    headers['Authorization'] = f"Bearer {access_token}"
+                    response = requests.post(
+                        self.api_config.get('apiUrl'),
+                        json=data,
+                        headers=headers,
+                        timeout=30
+                    )
+                else:
+                    raise Exception("获取文心一言access_token失败")
+                    
+            elif self.model == 'volcengine':
+                headers['Authorization'] = f"Bearer {self.api_config.get('apiKey')}"
+                data = {
+                    'model': self.api_config.get('model'),
+                    'messages': messages,
+                    'temperature': temperature,
+                    'max_tokens': max_tokens
+                }
+                response = requests.post(
+                    self.api_config.get('apiUrl'),
+                    json=data,
+                    headers=headers,
+                    timeout=30
+                )
+                
+            else:
+                raise Exception(f"不支持的模型类型: {self.model}")
+            
+            if response.status_code == 200:
+                return response.json()
+            else:
+                raise Exception(f"API请求失败，状态码: {response.status_code}, 响应: {response.text}")
+                
+        except Exception as e:
+            raise Exception(f"REST API请求失败: {str(e)}")
     
     def analyze_stock(self, stock_code: str, stock_name: str, stock_data: Dict) -> Dict:
-        if not self.client:
+        if not self.model or not self.api_config:
             return self._mock_analysis(stock_code, stock_name, stock_data)
         
         try:
             prompt = self._build_analysis_prompt(stock_code, stock_name, stock_data)
             
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "你是一位专业的股票分析师，擅长分析A股市场龙头股。请用简洁专业的语言进行分析。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=1000
-            )
+            # 使用用户设置的参数
+            temperature = self.params.get('temperature', 0.7) if self.params else 0.7
+            max_tokens = self.params.get('maxTokens', 1000) if self.params else 1000
             
-            analysis_text = response.choices[0].message.content
+            # 构造消息格式
+            messages = [
+                {"role": "system", "content": "你是一位专业的股票分析师，擅长分析A股市场龙头股。请用简洁专业的语言进行分析。"},
+                {"role": "user", "content": prompt}
+            ]
+            
+            # 使用统一的REST API请求
+            response_data = self._make_chat_request(messages, temperature, max_tokens)
+            
+            # 根据不同的模型解析响应
+            if self.model == 'openai':
+                analysis_text = response_data['choices'][0]['message']['content']
+            elif self.model == 'claude':
+                analysis_text = response_data['content'][0]['text']
+            elif self.model == 'gemini':
+                analysis_text = response_data['candidates'][0]['content']['parts'][0]['text']
+            elif self.model == 'qwen':
+                analysis_text = response_data['output']['text']
+            elif self.model == 'ernie':
+                analysis_text = response_data['result']
+            elif self.model == 'volcengine':
+                analysis_text = response_data['choices'][0]['message']['content']
+            else:
+                return self._mock_analysis(stock_code, stock_name, stock_data)
             
             return {
                 'stock_code': stock_code,
@@ -200,7 +335,7 @@ class AIService:
         }
     
     def generate_market_summary(self, leader_stocks: List[Dict]) -> str:
-        if not self.client:
+        if not self.model or not self.api_config:
             return self._mock_market_summary(leader_stocks)
         
         try:
@@ -223,17 +358,35 @@ class AIService:
 请用简洁专业的语言撰写。
 """
             
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": "你是一位专业的股市分析师，擅长撰写市场分析报告。"},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=1500
-            )
+            # 使用用户设置的参数
+            temperature = self.params.get('temperature', 0.7) if self.params else 0.7
+            max_tokens = self.params.get('maxTokens', 1500) if self.params else 1500
             
-            return response.choices[0].message.content
+            # 构造消息格式
+            messages = [
+                {"role": "system", "content": "你是一位专业的股市分析师，擅长撰写市场分析报告。"},
+                {"role": "user", "content": prompt}
+            ]
+            
+            # 使用统一的REST API请求
+            response_data = self._make_chat_request(messages, temperature, max_tokens)
+            
+            # 根据不同的模型解析响应
+            if self.model == 'openai':
+                return response_data['choices'][0]['message']['content']
+            elif self.model == 'claude':
+                return response_data['content'][0]['text']
+            elif self.model == 'gemini':
+                return response_data['candidates'][0]['content']['parts'][0]['text']
+            elif self.model == 'qwen':
+                return response_data['output']['text']
+            elif self.model == 'ernie':
+                return response_data['result']
+            elif self.model == 'volcengine':
+                return response_data['choices'][0]['message']['content']
+            else:
+                return self._mock_market_summary(leader_stocks)
+                
         except Exception as e:
             print(f"生成市场总结失败: {e}")
             return self._mock_market_summary(leader_stocks)
@@ -263,3 +416,62 @@ class AIService:
    短期市场有望延续活跃态势，建议关注龙头股的持续性。
    注意风险控制，把握结构性机会，避免追高。
 """
+    
+    def test_model(self, model: str, params: Dict, api_config: Dict) -> Dict:
+        """测试模型配置是否正确"""
+        try:
+            # 临时设置模型配置用于测试
+            original_model = self.model
+            original_api_config = self.api_config
+            original_params = self.params
+            
+            self.model = model
+            self.api_config = api_config
+            self.params = params
+            
+            # 构造测试消息
+            messages = [
+                {"role": "system", "content": "你是一个测试助手"},
+                {"role": "user", "content": "测试连接，请回复'测试成功'"}
+            ]
+            
+            # 使用统一的REST API请求
+            temperature = params.get('temperature', 0.7) if params else 0.7
+            max_tokens = params.get('maxTokens', 100) if params else 100
+            
+            response_data = self._make_chat_request(messages, temperature, max_tokens)
+            
+            # 根据不同的模型解析响应
+            if model == 'openai':
+                response_text = response_data['choices'][0]['message']['content']
+            elif model == 'claude':
+                response_text = response_data['content'][0]['text']
+            elif model == 'gemini':
+                response_text = response_data['candidates'][0]['content']['parts'][0]['text']
+            elif model == 'qwen':
+                response_text = response_data['output']['text']
+            elif model == 'ernie':
+                response_text = response_data['result']
+            elif model == 'volcengine':
+                response_text = response_data['choices'][0]['message']['content']
+            else:
+                return {'status': 'error', 'message': f'不支持的模型类型: {model}'}
+            
+            # 恢复原始配置
+            self.model = original_model
+            self.api_config = original_api_config
+            self.params = original_params
+            
+            return {
+                'status': 'success',
+                'message': '模型测试成功',
+                'response': response_text
+            }
+            
+        except Exception as e:
+            # 恢复原始配置
+            self.model = original_model
+            self.api_config = original_api_config
+            self.params = original_params
+            
+            return {'status': 'error', 'message': f'测试过程中发生错误: {str(e)}'}

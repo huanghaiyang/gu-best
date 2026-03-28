@@ -457,14 +457,18 @@ const renderKlineChart = (stock) => {
         const kValues = kdj.map(d => d.k);
         const dValues = kdj.map(d => d.d);
         const jValues = kdj.map(d => d.j);
-        const maxKdj = 100;
+        // 计算实际的KDJ值范围
+        const allKdjValues = [...kValues, ...dValues, ...jValues];
+        const maxKdj = Math.max(...allKdjValues) || 100;
+        const minKdj = Math.min(...allKdjValues) || 0;
         
         // KDJ显示在成交量下方
         
         // 绘制KDJ Y轴数值
+        const kdjRange = maxKdj - minKdj || 1;
         for (let i = 0; i <= 5; i++) {
-            const value = maxKdj - (maxKdj / 5) * i;
-            const y = kdjBaseY + (maxKdj - value) / maxKdj * indicatorHeight;
+            const value = maxKdj - (kdjRange / 5) * i;
+            const y = kdjBaseY + (maxKdj - value) / kdjRange * indicatorHeight;
             const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
             text.setAttribute('x', '25');
             text.setAttribute('y', y + 4);
@@ -479,7 +483,7 @@ const renderKlineChart = (stock) => {
             let path = '';
             values.forEach((v, i) => {
                 const x = 30 + i * barWidth + barWidth / 2;
-                const y = kdjBaseY + (maxKdj - v) / maxKdj * indicatorHeight;
+                const y = kdjBaseY + (maxKdj - v) / kdjRange * indicatorHeight;
                 path += (i === 0 ? 'M' : 'L') + `${x},${y}`;
             });
             const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -500,9 +504,13 @@ const renderKlineChart = (stock) => {
             const crossovers = [];
             for (let i = 1; i < k.length; i++) {
                 if (k[i-1] < d[i-1] && k[i] > d[i]) {
-                    crossovers.push({ type: 'golden', index: i, price: (k[i] + d[i]) / 2 });
+                    // 金叉发生在i-1和i之间，计算交点价格
+                    const price = (k[i] + d[i]) / 2;
+                    crossovers.push({ type: 'golden', index: i - 0.5, price: price });
                 } else if (k[i-1] > d[i-1] && k[i] < d[i]) {
-                    crossovers.push({ type: 'death', index: i, price: (k[i] + d[i]) / 2 });
+                    // 死叉发生在i-1和i之间，计算交点价格
+                    const price = (k[i] + d[i]) / 2;
+                    crossovers.push({ type: 'death', index: i - 0.5, price: price });
                 }
             }
             return crossovers;
@@ -536,7 +544,7 @@ const renderKlineChart = (stock) => {
         const drawMarkers = (markers) => {
             markers.forEach(marker => {
                 const x = 30 + marker.index * barWidth + barWidth / 2;
-                const y = kdjBaseY + (maxKdj - marker.price) / maxKdj * indicatorHeight;
+                const y = kdjBaseY + (maxKdj - marker.price) / kdjRange * indicatorHeight;
                 
                 let color, text;
                 switch (marker.type) {

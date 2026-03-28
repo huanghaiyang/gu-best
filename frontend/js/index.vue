@@ -35,6 +35,39 @@ const modelParams = ref({
     temperature: 0.7,
     maxTokens: 2048
 });
+const apiConfigs = ref({
+    volcengine: {
+        apiUrl: 'https://ark.cn-beijing.volces.com/api/v3/responses',
+        apiKey: '',
+        model: 'doubao-seed-2-0-pro-260215'
+    },
+    openai: {
+        apiUrl: 'https://api.openai.com/v1',
+        apiKey: '',
+        model: 'gpt-4'
+    },
+    claude: {
+        apiUrl: 'https://api.anthropic.com/v1',
+        apiKey: '',
+        model: 'claude-3-opus-20240229'
+    },
+    gemini: {
+        apiUrl: 'https://generativelanguage.googleapis.com/v1beta',
+        apiKey: '',
+        model: 'gemini-pro'
+    },
+    qwen: {
+        apiUrl: 'https://dashscope.aliyuncs.com/api/v1',
+        apiKey: '',
+        model: 'qwen-turbo'
+    },
+    ernie: {
+        apiUrl: 'https://aip.baidubce.com/rpc/2.0/ai_custom/v1',
+        apiKey: '',
+        secretKey: '',
+        model: 'ernie-bot-4'
+    }
+});
 const models = ref([
     {
         id: 'volcengine',
@@ -164,7 +197,14 @@ const analyzeStock = async (stock) => {
     currentAnalysis.value = {};
 
     try {
-        const data = await api.analyzeStock(stock.code, stock.name, stock);
+        // 准备模型配置
+        const modelConfig = {
+            model: selectedModel.value,
+            params: modelParams.value,
+            apiConfig: apiConfigs.value[selectedModel.value]
+        };
+        
+        const data = await api.analyzeStock(stock.code, stock.name, stock, modelConfig);
         if (data.success) {
             currentAnalysis.value = data.data;
         }
@@ -295,31 +335,44 @@ const updateTime = () => {
 };
 
 // 模型设置方法
-const loadModelSettings = () => {
-    const saved = localStorage.getItem('modelSettings');
-    if (saved) {
-        const settings = JSON.parse(saved);
-        selectedModel.value = settings.model || 'volcengine';
-        modelParams.value = { ...modelParams.value, ...settings.params };
+const loadModelSettings = async () => {
+    try {
+        const response = await api.getSetting('modelSettings');
+        if (response.success && response.data) {
+            const settings = response.data;
+            selectedModel.value = settings.model || 'volcengine';
+            modelParams.value = { ...modelParams.value, ...settings.params };
+            if (settings.apiConfigs) {
+                apiConfigs.value = { ...apiConfigs.value, ...settings.apiConfigs };
+            }
+        }
+    } catch (error) {
+        console.error('加载模型设置失败:', error);
     }
 };
 
-const saveModelSettings = () => {
-    const settings = {
-        model: selectedModel.value,
-        params: modelParams.value
-    };
-    localStorage.setItem('modelSettings', JSON.stringify(settings));
-    showModelSettings.value = false;
-    alert('模型设置已保存');
+const saveModelSettings = async () => {
+    try {
+        const settings = {
+            model: selectedModel.value,
+            params: modelParams.value,
+            apiConfigs: apiConfigs.value
+        };
+        await api.setSetting('modelSettings', settings);
+        showModelSettings.value = false;
+        alert('模型设置已保存');
+    } catch (error) {
+        console.error('保存模型设置失败:', error);
+        alert('保存模型设置失败，请稍后重试');
+    }
 };
 
-onMounted(() => {
+onMounted(async () => {
     loadIndexData();
     loadSectors();
     loadStocks();
     updateTime();
-    loadModelSettings();
+    await loadModelSettings();
     setInterval(updateTime, 1000);
 });
 
@@ -394,6 +447,46 @@ onUnmounted(() => {
                                             max="4096"
                                         >
                                     </div>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-4">
+                                <label class="form-label fw-bold">API配置</label>
+                                <div class="mb-3">
+                                    <label class="form-label">API地址</label>
+                                    <input 
+                                        type="text" 
+                                        v-model="apiConfigs[selectedModel].apiUrl" 
+                                        class="form-control bg-gray-800 border-gray-700 text-white"
+                                        placeholder="请输入API地址"
+                                    >
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">API Key</label>
+                                    <input 
+                                        type="password" 
+                                        v-model="apiConfigs[selectedModel].apiKey" 
+                                        class="form-control bg-gray-800 border-gray-700 text-white"
+                                        placeholder="请输入API Key"
+                                    >
+                                </div>
+                                <div class="mb-3" v-if="selectedModel === 'ernie'">
+                                    <label class="form-label">Secret Key</label>
+                                    <input 
+                                        type="password" 
+                                        v-model="apiConfigs[selectedModel].secretKey" 
+                                        class="form-control bg-gray-800 border-gray-700 text-white"
+                                        placeholder="请输入Secret Key"
+                                    >
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">模型名称</label>
+                                    <input 
+                                        type="text" 
+                                        v-model="apiConfigs[selectedModel].model" 
+                                        class="form-control bg-gray-800 border-gray-700 text-white"
+                                        placeholder="请输入模型名称"
+                                    >
                                 </div>
                             </div>
                         </div>
