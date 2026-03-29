@@ -19,6 +19,7 @@ const props = defineProps({
 const emit = defineEmits(['select', 'refresh']);
 
 const collapsedCategories = ref({});
+const allCollapsed = ref(false);
 
 const sectorsByCategory = computed(() => {
     const grouped = { '其他': [] };
@@ -55,6 +56,14 @@ const toggleCategory = (category) => {
     collapsedCategories.value[category] = !collapsedCategories.value[category];
 };
 
+const toggleAll = () => {
+    allCollapsed.value = !allCollapsed.value;
+    // 遍历所有分类并设置为相同的折叠状态
+    Object.keys(sectorsByCategory.value).forEach(category => {
+        collapsedCategories.value[category] = allCollapsed.value;
+    });
+};
+
 const isCollapsed = (category) => {
     return collapsedCategories.value[category] === true;
 };
@@ -68,9 +77,15 @@ const refreshSectors = () => {
     <div class="card">
         <div class="card-header d-flex justify-content-between align-items-center">
             <span><i class="bi bi-grid-3x3-gap me-2"></i>热门板块</span>
-            <button class="btn btn-sm btn-outline-primary" @click="refreshSectors">
-                <i class="bi bi-arrow-clockwise me-1"></i>刷新
-            </button>
+            <div class="d-flex gap-2">
+                <button class="btn btn-sm btn-outline-primary" @click="toggleAll">
+                    <i :class="allCollapsed ? 'bi bi-chevron-down' : 'bi bi-chevron-up'" class="me-1"></i>
+                    {{ allCollapsed ? '展开全部' : '折叠全部' }}
+                </button>
+                <button class="btn btn-sm btn-outline-primary" @click="refreshSectors">
+                    <i class="bi bi-arrow-clockwise me-1"></i>刷新
+                </button>
+            </div>
         </div>
         <div class="card-body">
             <div v-if="loading" class="loading">

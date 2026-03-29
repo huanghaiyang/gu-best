@@ -1,14 +1,15 @@
 <script setup>
-import { ref, watch, onBeforeUnmount, nextTick } from 'vue';
+import { ref, watch, onBeforeUnmount, nextTick, computed } from 'vue';
 import api from '../api.js';
 
 const props = defineProps({
     stocks: Array,
     loading: Boolean,
-    category: String
+    category: String,
+    sector: Object
 });
 
-const emit = defineEmits(['refresh-prices', 'analyze', 'filter']);
+const emit = defineEmits(['refresh-prices', 'analyze', 'filter', 'sort']);
 
 const expandedRow = ref(null);
 const klineData = ref(null);
@@ -25,6 +26,56 @@ const filters = ref({
     minVolume: '',
     maxVolume: ''
 });
+
+const sortConfig = ref({
+    field: null,
+    order: 'asc'
+});
+
+const sortedStocks = computed(() => {
+    if (!props.stocks || props.stocks.length === 0) return [];
+    
+    if (!sortConfig.value.field) return props.stocks;
+    
+    const sorted = [...props.stocks];
+    sorted.sort((a, b) => {
+        let aVal = a[sortConfig.value.field];
+        let bVal = b[sortConfig.value.field];
+        
+        if (aVal === undefined || aVal === null) aVal = 0;
+        if (bVal === undefined || bVal === null) bVal = 0;
+        
+        if (typeof aVal === 'string') {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+        
+        if (aVal < bVal) return sortConfig.value.order === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortConfig.value.order === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    return sorted;
+});
+
+const handleSort = (field) => {
+    if (sortConfig.value.field === field) {
+        sortConfig.value.order = sortConfig.value.order === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortConfig.value.field = field;
+        sortConfig.value.order = 'desc';
+    }
+    
+    emit('sort', {
+        field: sortConfig.value.field,
+        order: sortConfig.value.order
+    });
+};
+
+const getSortIcon = (field) => {
+    if (sortConfig.value.field !== field) return '';
+    return sortConfig.value.order === 'asc' ? '↑' : '↓';
+};
 
 watch(localAutoRefresh, (newVal) => {
     if (newVal) {
@@ -752,6 +803,16 @@ const formatAmount = (amount) => {
     return parseFloat(amount).toFixed(4);
 };
 
+const formatMarketCap = (market_cap) => {
+    if (market_cap === undefined || market_cap === null) return '-';
+    
+    const value = parseFloat(market_cap);
+    if (isNaN(value)) return '-';
+    
+    // 转换为亿
+    return (value / 100000000).toFixed(2);
+};
+
 const analyzeStock = (stock) => {
     emit('analyze', stock);
 };
@@ -784,11 +845,21 @@ const closeFilterModal = () => {
 <template>
     <div class="stock-table-container">
         <div class="table-header">
-            <div class="header-left d-flex align-items-center">
-                <h3 class="mb-0">{{ category || '股票列表' }}</h3>
-                <button class="btn btn-sm btn-outline-primary ms-3" @click="openFilterModal">
-                    手动筛选
-                </button>
+            <div class="header-left d-flex flex-column">
+                <div class="d-flex align-items-center">
+                    <h3 class="mb-0">{{ category || '股票列表' }}</h3>
+                    <button class="btn btn-sm btn-outline-primary ms-3" @click="openFilterModal">
+                        手动筛选
+                    </button>
+                </div>
+                <div v-if="sector" class="sector-info mt-1">
+                    <span class="text-muted small">
+                        所属板块: <strong>{{ sector.name }}</strong>
+                        <span :class="sector.change_pct > 0 ? 'text-danger' : 'text-success'">
+                            {{ sector.change_pct > 0 ? '+' : '' }}{{ sector.change_pct.toFixed(2) }}%
+                        </span>
+                    </span>
+                </div>
             </div>
             <div class="auto-refresh-control d-flex align-items-center">
                 <label class="switch">
@@ -811,18 +882,32 @@ const closeFilterModal = () => {
             <table class="stock-table">
                 <thead>
                     <tr>
-                        <th>股票</th>
-                        <th>最新价</th>
-                        <th>涨跌幅</th>
-                        <th>涨跌额</th>
-                        <th>成交量(万)</th>
-                        <th>成交额(亿)</th>
-                        <th>市值(亿)</th>
+                        <th @click="handleSort('name')" class="sortable">
+                            股票<span class="sort-icon">{{ getSortIcon('name') }}</span>
+                        </th>
+                        <th @click="handleSort('price')" class="sortable">
+                            最新价<span class="sort-icon">{{ getSortIcon('price') }}</span>
+                        </th>
+                        <th @click="handleSort('change_pct')" class="sortable">
+                            涨跌幅<span class="sort-icon">{{ getSortIcon('change_pct') }}</span>
+                        </th>
+                        <th @click="handleSort('change')" class="sortable">
+                            涨跌额<span class="sort-icon">{{ getSortIcon('change') }}</span>
+                        </th>
+                        <th @click="handleSort('volume')" class="sortable">
+                            成交量(万)<span class="sort-icon">{{ getSortIcon('volume') }}</span>
+                        </th>
+                        <th @click="handleSort('amount')" class="sortable">
+                            成交额(亿)<span class="sort-icon">{{ getSortIcon('amount') }}</span>
+                        </th>
+                        <th @click="handleSort('market_cap')" class="sortable">
+                            市值(亿)<span class="sort-icon">{{ getSortIcon('market_cap') }}</span>
+                        </th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <template v-for="stock in stocks" :key="stock.code">
+                    <template v-for="stock in sortedStocks" :key="stock.code">
                         <tr class="stock-row" @click="toggleRow(stock)">
                             <td>
                                 <div class="stock-info">
@@ -841,7 +926,7 @@ const closeFilterModal = () => {
                             </td>
                             <td>{{ formatVolume(stock.volume) }}</td>
                             <td>{{ formatAmount(stock.amount) }}</td>
-                            <td>{{ stock.market_cap ? parseFloat(stock.market_cap).toFixed(2) : '-' }}</td>
+                            <td>{{ formatMarketCap(stock.market_cap) }}</td>
                             <td class="action">
                                 <button class="btn btn-sm btn-primary" @click.stop="analyzeStock(stock)">
                                     AI分析

@@ -1,108 +1,85 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import Sidebar from './components/sidebar.vue';
-import StatsCard from './components/stats-card.vue';
-import SectorTags from './components/sector-tags.vue';
-import StockTable from './components/stock-table.vue';
-import StockSearch from './components/stock-search.vue';
+import LeaderPage from './components/leader-page.vue';
+import SearchPage from './components/search-page.vue';
+import PortfolioPage from './components/portfolio-page.vue';
 import AnalysisModal from './components/analysis-modal.vue';
 import api from './api.js';
 
-const currentPage = ref('leader');
-const sectors = ref([]);
-const stocks = ref([]);
-const searchResults = ref([]);
-const currentSector = ref(null);
-const sectorsLoading = ref(false);
-const stocksLoading = ref(false);
-const searchLoading = ref(false);
+const tabs = ref([]);
+const activeTab = ref(null);
 const modalVisible = ref(false);
 const modalLoading = ref(false);
 const currentStock = ref({});
 const currentAnalysis = ref({});
 
-const indexData = ref({
-    sh: { name: '上证指数', code: '000001', price: 0, change: 0, change_pct: 0 },
-    sz: { name: '深证成指', code: '399001', price: 0, change: 0, change_pct: 0 },
-    cy: { name: '创业板指', code: '399006', price: 0, change: 0, change_pct: 0 },
-    kc: { name: '科创50', code: '000688', price: 0, change: 0, change_pct: 0 }
-});
+const pageNames = {
+    'leader': '龙头股票',
+    'search': '股票搜索',
+    'portfolio': '自选股'
+};
 
-const stats = computed(() => {
-    if (stocks.value.length === 0) {
-        return {
-            total: '-',
-            avgChange: '-',
-            avgVolume: '-',
-            avgScore: '-'
-        };
+const pageComponents = {
+    'leader': LeaderPage,
+    'search': SearchPage,
+    'portfolio': PortfolioPage
+};
+
+const pageRefs = ref({});
+
+const navigateTo = (page) => {
+    const existingTab = tabs.value.find(tab => tab.id === page);
+    if (existingTab) {
+        activeTab.value = page;
+    } else {
+        tabs.value.push({ id: page, name: pageNames[page] || page });
+        activeTab.value = page;
     }
-    const total = stocks.value.length;
-    const avgChange = stocks.value.reduce((sum, s) => sum + (s.change_pct || 0), 0) / total;
-    const avgVolume = stocks.value.reduce((sum, s) => sum + (s.volume_ratio || 0), 0) / total;
-    const avgScore = stocks.value.reduce((sum, s) => sum + (s.score || 0), 0) / total;
-    return {
-        total,
-        avgChange: avgChange.toFixed(2) + '%',
-        avgVolume: avgVolume.toFixed(2),
-        avgScore: avgScore.toFixed(1)
-    };
-});
+    updateHash(page);
+};
 
-const loadIndexData = async () => {
-    try {
-        const data = await api.getIndexData();
-        if (data.success) {
-            indexData.value = data.data;
+const closeTab = (tabId, event) => {
+    event.stopPropagation();
+    const index = tabs.value.findIndex(tab => tab.id === tabId);
+    if (index > -1) {
+        tabs.value.splice(index, 1);
+        if (activeTab.value === tabId) {
+            if (tabs.value.length > 0) {
+                const newActiveTab = tabs.value[Math.max(0, index - 1)];
+                activeTab.value = newActiveTab.id;
+                updateHash(newActiveTab.id);
+            } else {
+                activeTab.value = null;
+                updateHash('');
+            }
         }
-    } catch (error) {
-        console.error('加载指数数据失败:', error);
     }
 };
 
-const loadSectors = async () => {
-    sectorsLoading.value = true;
-    try {
-        const data = await api.getSectors();
-        if (data.success) {
-            sectors.value = data.data;
-        }
-    } catch (error) {
-        console.error('加载板块失败:', error);
+const updateHash = (page) => {
+    if (page) {
+        window.location.hash = `#${page}`;
+    } else {
+        window.location.hash = '';
     }
-    sectorsLoading.value = false;
 };
 
-const loadStocks = async (topN = 10) => {
-    stocksLoading.value = true;
-    try {
-        const data = await api.getLeaderStocks(currentSector.value, topN);
-        if (data.success) {
-            stocks.value = data.data;
+const handleHashChange = () => {
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+        const existingTab = tabs.value.find(tab => tab.id === hash);
+        if (existingTab) {
+            activeTab.value = hash;
+        } else {
+            tabs.value.push({ id: hash, name: pageNames[hash] || hash });
+            activeTab.value = hash;
         }
-    } catch (error) {
-        console.error('加载股票失败:', error);
-    }
-    stocksLoading.value = false;
-};
-
-const searchStock = async (query) => {
-    searchLoading.value = true;
-    searchResults.value = [];
-    try {
-        const data = await api.searchStock(query);
-        if (data.success) {
-            searchResults.value = data.data;
+    } else {
+        if (tabs.value.length === 0) {
+            activeTab.value = null;
         }
-    } catch (error) {
-        console.error('查询失败:', error);
     }
-    searchLoading.value = false;
-};
-
-const selectSector = (sectorCode) => {
-    currentSector.value = currentSector.value === sectorCode ? null : sectorCode;
-    loadStocks();
 };
 
 const analyzeStock = async (stock) => {
@@ -126,155 +103,66 @@ const closeModal = () => {
     modalVisible.value = false;
 };
 
-const navigateTo = (page) => {
-    currentPage.value = page;
-    if (page === 'leader') {
-        loadSectors();
-        loadStocks();
+const refreshActiveTabPrices = () => {
+    if (activeTab.value && pageRefs.value[activeTab.value]) {
+        const pageComponent = pageRefs.value[activeTab.value];
+        if (pageComponent && pageComponent.refreshStockPrices) {
+            pageComponent.refreshStockPrices();
+        }
     }
 };
 
-const refreshStockPrices = async () => {
-    if (currentPage.value === 'leader' && stocks.value.length > 0) {
-        try {
-            // 只刷新股价数据，不刷新整个股票列表
-            const updatedStocks = await Promise.all(stocks.value.map(async (stock) => {
-                try {
-                    const realtimeData = await api.getRealtimeQuote(stock.code);
-                    if (realtimeData && realtimeData.success) {
-                        return {
-                            ...stock,
-                            price: realtimeData.data.price,
-                            change: realtimeData.data.change,
-                            change_pct: realtimeData.data.change_pct,
-                            volume: realtimeData.data.volume
-                        };
-                    }
-                    return stock;
-                } catch (error) {
-                    console.error('刷新股票价格失败:', error);
-                    return stock;
-                }
-            }));
-            
-            stocks.value = updatedStocks;
-        } catch (error) {
-            console.error('刷新股价数据失败:', error);
-        }
-    } else if (currentPage.value === 'search' && searchResults.value.length > 0) {
-        try {
-            const updatedResults = await Promise.all(searchResults.value.map(async (stock) => {
-                try {
-                    const realtimeData = await api.getRealtimeQuote(stock.code);
-                    if (realtimeData && realtimeData.success) {
-                        return {
-                            ...stock,
-                            price: realtimeData.data.price,
-                            change: realtimeData.data.change,
-                            change_pct: realtimeData.data.change_pct,
-                            volume: realtimeData.data.volume
-                        };
-                    }
-                    return stock;
-                } catch (error) {
-                    console.error('刷新搜索结果价格失败:', error);
-                    return stock;
-                }
-            }));
-            
-            searchResults.value = updatedResults;
-        } catch (error) {
-            console.error('刷新搜索结果股价数据失败:', error);
-        }
-    }
+const handleAnalyzeStock = (event) => {
+    const stock = event.detail;
+    analyzeStock(stock);
 };
 
 onMounted(() => {
-    loadIndexData();
-    loadSectors();
-    loadStocks();
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    window.addEventListener('analyze-stock', handleAnalyzeStock);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('hashchange', handleHashChange);
+    window.removeEventListener('analyze-stock', handleAnalyzeStock);
 });
 </script>
 
 <template>
     <div class="app-container">
-        <sidebar :current-page="currentPage" @navigate="navigateTo"></sidebar>
+        <sidebar @navigate="navigateTo"></sidebar>
         
         <div class="main-content">
             <div class="content-wrapper">
-                <div v-if="currentPage === 'leader'" class="index-bar mb-3">
-                    <div class="row">
-                        <div class="col-md-3" v-for="(idx, key) in indexData" :key="key">
-                            <div class="index-card" :class="idx.change_pct >= 0 ? 'up' : 'down'">
-                                <div class="index-name">{{ idx.name }}</div>
-                                <div class="index-price">{{ idx.price.toFixed(2) }}</div>
-                                <div class="index-change">
-                                    <span>{{ idx.change >= 0 ? '+' : '' }}{{ idx.change.toFixed(2) }}</span>
-                                    <span class="ms-2">{{ idx.change_pct >= 0 ? '+' : '' }}{{ idx.change_pct.toFixed(2) }}%</span>
-                                </div>
-                            </div>
-                        </div>
+                <div v-if="tabs.length > 0" class="tabs-container mb-3">
+                    <div 
+                        v-for="tab in tabs" 
+                        :key="tab.id"
+                        :class="['tab-item', { active: activeTab === tab.id }]"
+                        @click="activeTab = tab.id; updateHash(tab.id)"
+                    >
+                        <span class="tab-title">{{ tab.name }}</span>
+                        <span class="tab-close" @click="closeTab(tab.id, $event)">&times;</span>
                     </div>
                 </div>
 
-                <div v-if="currentPage === 'leader'">
-                    <div class="row mb-4">
-                        <div class="col-md-3">
-                            <stats-card title="筛选股票数" :value="stats.total"></stats-card>
-                        </div>
-                        <div class="col-md-3">
-                            <stats-card title="平均涨幅" :value="stats.avgChange" value-class="text-danger"></stats-card>
-                        </div>
-                        <div class="col-md-3">
-                            <stats-card title="平均量比" :value="stats.avgVolume" value-class="text-success"></stats-card>
-                        </div>
-                        <div class="col-md-3">
-                            <stats-card title="平均得分" :value="stats.avgScore"></stats-card>
-                        </div>
-                    </div>
-
-                    <div class="row mb-4">
-                        <div class="col-12">
-                            <sector-tags 
-                                :sectors="sectors" 
-                                :current-sector="currentSector"
-                                :loading="sectorsLoading"
-                                @select="selectSector"
-                                @refresh="loadSectors"
-                            ></sector-tags>
-                        </div>
-                    </div>
-
-                    <div class="row">
-                        <div class="col-12">
-                            <stock-table 
-                                :stocks="stocks"
-                                :loading="stocksLoading"
-                                @analyze="analyzeStock"
-                                @refresh-prices="refreshStockPrices"
-                            ></stock-table>
-                        </div>
-                    </div>
+                <div v-if="activeTab && pageComponents[activeTab]" class="page-content">
+                    <keep-alive>
+                        <component 
+                            :is="pageComponents[activeTab]" 
+                            :ref="(el) => { if (el) pageRefs[activeTab] = el; }"
+                            @analyze="analyzeStock"
+                        ></component>
+                    </keep-alive>
                 </div>
 
-                <div v-if="currentPage === 'search'">
-                    <stock-search 
-                        :loading="searchLoading"
-                        :results="searchResults"
-                        @search="searchStock"
-                        @analyze="analyzeStock"
-                        @refresh-prices="refreshStockPrices"
-                    ></stock-search>
-                </div>
-
-
-
-                <div v-if="currentPage === 'portfolio'">
+                <div v-if="!activeTab" class="empty-tabs-state">
                     <div class="card">
                         <div class="card-body text-center py-5">
-                            <i class="bi bi-wallet2" style="font-size: 3rem; color: #64748b;"></i>
-                            <h5 class="mt-3">自选股功能</h5>
-                            <p class="text-muted">功能开发中，敬请期待...</p>
+                            <i class="bi bi-grid-3x3-gap" style="font-size: 3rem; color: #64748b;"></i>
+                            <h5 class="mt-3">欢迎使用股票分析系统</h5>
+                            <p class="text-muted">请从左侧菜单选择功能开始使用</p>
                         </div>
                     </div>
                 </div>

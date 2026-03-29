@@ -1,14 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import _ from 'lodash';
 import api from '../api.js';
-
-const props = defineProps({
-    currentPage: {
-        type: String,
-        default: 'leader'
-    }
-});
 
 const emit = defineEmits(['navigate']);
 
@@ -17,6 +10,13 @@ const menuItems = ref([
     { id: 'search', icon: 'bi-search', label: '股票查询' },
     { id: 'portfolio', icon: 'bi-wallet2', label: '自选股' }
 ]);
+
+const currentHash = ref(window.location.hash.slice(1) || '');
+
+const handleHashChange = () => {
+    currentHash.value = window.location.hash.slice(1) || '';
+};
+
 const showSettingsPanel = ref(false);
 const activeSettingsTab = ref('model');
 const selectedModel = ref('volcengine');
@@ -333,6 +333,11 @@ const saveAllSettings = async () => {
 onMounted(async () => {
     await loadModelSettings();
     await loadAllSettings();
+    window.addEventListener('hashchange', handleHashChange);
+});
+
+onUnmounted(() => {
+    window.removeEventListener('hashchange', handleHashChange);
 });
 </script>
 
@@ -348,7 +353,7 @@ onMounted(async () => {
                 v-for="item in menuItems" 
                 :key="item.id"
                 class="nav-item"
-                :class="{ active: currentPage === item.id }"
+                :class="{ active: currentHash === item.id }"
                 @click="$emit('navigate', item.id)"
             >
                 <i :class="'bi ' + item.icon + ' me-2'"></i>
