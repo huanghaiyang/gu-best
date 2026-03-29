@@ -1,10 +1,12 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue';
 import StatsCard from './stats-card.vue';
 import SectorTags from './sector-tags.vue';
 import StockTable from './stock-table.vue';
 import PageContainer from './page-container.vue';
 import api from '../api.js';
+import { startMarketStatusCheck, stopMarketStatusCheck } from '../store/marketStatus.js';
+import { useAutoRefresh } from '../hooks/useAutoRefresh.js';
 
 const sectors = ref([]);
 const stocks = ref([]);
@@ -44,6 +46,8 @@ const currentSectorInfo = computed(() => {
     if (!currentSector.value) return null;
     return sectors.value.find(sector => sector.code === currentSector.value) || null;
 });
+
+
 
 const loadIndexData = async () => {
     try {
@@ -87,8 +91,8 @@ const selectSector = (sectorCode) => {
     loadStocks();
 };
 
-const refreshStockPrices = async () => {
-    // 同时刷新板块数据，确保板块信息的实时性
+const refreshAllData = async () => {
+    await loadIndexData();
     await loadSectors();
     
     if (stocks.value.length > 0) {
@@ -119,6 +123,12 @@ const refreshStockPrices = async () => {
     }
 };
 
+const { start: startAutoRefresh, stop: stopAutoRefresh } = useAutoRefresh(refreshAllData, {
+    interval: 1000,
+    onlyDuringMarketHours: true,
+    immediate: true
+});
+
 const analyzeStock = (stock) => {
     window.dispatchEvent(new CustomEvent('analyze-stock', { detail: stock }));
 };
@@ -127,10 +137,17 @@ onMounted(() => {
     loadIndexData();
     loadSectors();
     loadStocks();
+    startMarketStatusCheck();
+    startAutoRefresh();
+});
+
+onBeforeUnmount(() => {
+    stopAutoRefresh();
+    stopMarketStatusCheck();
 });
 
 defineExpose({
-    refreshStockPrices
+    refreshStockPrices: refreshAllData
 });
 </script>
 
@@ -187,7 +204,6 @@ defineExpose({
                         :category="currentSectorInfo ? currentSectorInfo.name : '涨幅榜'"
                         :sector="currentSectorInfo"
                         @analyze="analyzeStock"
-                        @refresh-prices="refreshStockPrices"
                     ></stock-table>
                 </div>
             </div>

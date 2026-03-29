@@ -1,6 +1,8 @@
 <script setup>
-import { ref, watch, onBeforeUnmount, nextTick, computed } from 'vue';
+import { ref, nextTick, computed, onMounted, onBeforeUnmount, watch } from 'vue';
 import api from '../api.js';
+import { startMarketStatusCheck, stopMarketStatusCheck } from '../store/marketStatus.js';
+import { useAutoRefresh } from '../hooks/useAutoRefresh.js';
 
 const props = defineProps({
     stocks: Array,
@@ -9,15 +11,33 @@ const props = defineProps({
     sector: Object
 });
 
-const emit = defineEmits(['refresh-prices', 'analyze', 'filter', 'sort']);
+const emit = defineEmits(['analyze', 'filter', 'sort']);
 
 const expandedRow = ref(null);
 const klineData = ref(null);
 const klineLoading = ref(false);
-const localAutoRefresh = ref(false);
-const refreshTimer = ref(null);
-const refreshInterval = ref(1);
 const filterModalVisible = ref(false);
+const currentStock = ref(null);
+const { start: startKlineAutoRefresh, stop: stopKlineAutoRefresh } = useAutoRefresh(async () => {
+    if (currentStock.value && expandedRow.value === currentStock.value.code) {
+        try {
+            const data = await api.getKlineData(currentStock.value.code);
+            if (data.success) {
+                klineData.value = data.data;
+                console.log('刷新K线数据:', data.data);
+                requestAnimationFrame(() => {
+                    renderKlineChart(currentStock.value);
+                });
+            }
+        } catch (error) {
+            console.error('刷新K线数据失败:', error);
+        }
+    }
+}, {
+    interval: 1000,
+    onlyDuringMarketHours: true,
+    immediate: false
+});
 const filters = ref({
     minPrice: '',
     maxPrice: '',
@@ -77,24 +97,16 @@ const getSortIcon = (field) => {
     return sortConfig.value.order === 'asc' ? '↑' : '↓';
 };
 
-watch(localAutoRefresh, (newVal) => {
-    if (newVal) {
-        startAutoRefresh();
-    } else {
-        stopAutoRefresh();
-    }
-});
-
-onBeforeUnmount(() => {
-    stopAutoRefresh();
-});
-
 const toggleRow = async (stock) => {
     if (expandedRow.value === stock.code) {
+        stopKlineAutoRefresh();
         expandedRow.value = null;
         klineData.value = null;
+        currentStock.value = null;
     } else {
+        stopKlineAutoRefresh();
         expandedRow.value = stock.code;
+        currentStock.value = stock;
         klineLoading.value = true;
         klineData.value = null;
         try {
@@ -102,10 +114,10 @@ const toggleRow = async (stock) => {
             if (data.success) {
                 klineData.value = data.data;
                 console.log('K线数据:', data.data);
-                // 使用requestAnimationFrame确保DOM完全更新
                 requestAnimationFrame(() => {
                     renderKlineChart(stock);
                 });
+                startKlineAutoRefresh();
             } else {
                 console.error('获取K线数据失败:', data.error);
             }
@@ -113,20 +125,6 @@ const toggleRow = async (stock) => {
             console.error('加载K线数据失败:', error);
         }
         klineLoading.value = false;
-    }
-};
-
-const startAutoRefresh = () => {
-    stopAutoRefresh();
-    refreshTimer.value = setInterval(() => {
-        emit('refresh-prices');
-    }, refreshInterval.value * 1000);
-};
-
-const stopAutoRefresh = () => {
-    if (refreshTimer.value) {
-        clearInterval(refreshTimer.value);
-        refreshTimer.value = null;
     }
 };
 
@@ -840,6 +838,15 @@ const resetFilters = () => {
 const closeFilterModal = () => {
     filterModalVisible.value = false;
 };
+
+onMounted(() => {
+    startMarketStatusCheck();
+});
+
+onBeforeUnmount(() => {
+    stopKlineAutoRefresh();
+    stopMarketStatusCheck();
+});
 </script>
 
 <template>
@@ -859,18 +866,6 @@ const closeFilterModal = () => {
                             {{ sector.change_pct > 0 ? '+' : '' }}{{ sector.change_pct.toFixed(2) }}%
                         </span>
                     </span>
-                </div>
-            </div>
-            <div class="auto-refresh-control d-flex align-items-center">
-                <label class="switch">
-                    <input type="checkbox" v-model="localAutoRefresh">
-                    <span class="slider"></span>
-                </label>
-                <span class="ms-2">自动刷新</span>
-                <div class="interval-control ms-3">
-                    <select v-model.number="refreshInterval" style="width: 60px;">
-                        <option v-for="second in 10" :key="second" :value="second">{{ second }}秒</option>
-                    </select>
                 </div>
             </div>
         </div>
