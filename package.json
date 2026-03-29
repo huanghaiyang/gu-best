@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "股票分析平台 - Python后端 + Vue前端",
   "scripts": {
-    "dev": "npm run db:check && concurrently \"npm run python:dev\" \"npm run client:dev\" npm run test:dev",
+    "dev": "npm run db:check && concurrently \"npm run python:dev\" \"npm run client:dev\"",
     "python:dev": "python app.py",
     "python:prod": "npm run db:check && python app.py",
     "client:dev": "vite",

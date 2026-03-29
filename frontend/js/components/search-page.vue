@@ -2,6 +2,7 @@
 import { ref } from 'vue';
 import StockSearch from './stock-search.vue';
 import PageContainer from './page-container.vue';
+import StockTable from './stock-table.vue';
 import api from '../api.js';
 
 const searchResults = ref([]);
@@ -21,42 +22,9 @@ const searchStock = async (query) => {
     searchLoading.value = false;
 };
 
-const refreshStockPrices = async () => {
-    if (searchResults.value.length > 0) {
-        try {
-            const updatedResults = await Promise.all(searchResults.value.map(async (stock) => {
-                try {
-                    const realtimeData = await api.getRealtimeQuote(stock.code);
-                    if (realtimeData && realtimeData.success) {
-                        return {
-                            ...stock,
-                            price: realtimeData.data.price,
-                            change: realtimeData.data.change,
-                            change_pct: realtimeData.data.change_pct,
-                            volume: realtimeData.data.volume
-                        };
-                    }
-                    return stock;
-                } catch (error) {
-                    console.error('刷新搜索结果价格失败:', error);
-                    return stock;
-                }
-            }));
-            
-            searchResults.value = updatedResults;
-        } catch (error) {
-            console.error('刷新搜索结果股价数据失败:', error);
-        }
-    }
-};
-
 const analyzeStock = (stock) => {
     window.dispatchEvent(new CustomEvent('analyze-stock', { detail: stock }));
 };
-
-defineExpose({
-    refreshStockPrices
-});
 </script>
 
 <template>
@@ -64,11 +32,21 @@ defineExpose({
         <div class="search-page">
             <stock-search 
                 :loading="searchLoading"
-                :results="searchResults"
                 @search="searchStock"
-                @analyze="analyzeStock"
-                @refresh-prices="refreshStockPrices"
             ></stock-search>
+            
+            <div v-if="searchResults.length > 0" class="mt-4">
+                <stock-table 
+                    :stocks="searchResults"
+                    :loading="searchLoading"
+                    category="查询结果"
+                    :show-filter="false"
+                    :show-sort="true"
+                    :show-actions="true"
+                    :show-kline="true"
+                    @analyze="analyzeStock"
+                ></stock-table>
+            </div>
         </div>
     </page-container>
 </template>

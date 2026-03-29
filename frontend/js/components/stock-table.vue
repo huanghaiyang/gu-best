@@ -9,7 +9,23 @@ const props = defineProps({
     stocks: Array,
     loading: Boolean,
     category: String,
-    sector: Object
+    sector: Object,
+    showFilter: {
+        type: Boolean,
+        default: true
+    },
+    showSort: {
+        type: Boolean,
+        default: true
+    },
+    showActions: {
+        type: Boolean,
+        default: true
+    },
+    showKline: {
+        type: Boolean,
+        default: true
+    }
 });
 
 const emit = defineEmits(['analyze', 'filter', 'sort']);
@@ -860,7 +876,7 @@ onBeforeUnmount(() => {
             <div class="header-left d-flex flex-column">
                 <div class="d-flex align-items-center">
                     <h3 class="mb-0">{{ category || '股票列表' }}</h3>
-                    <button class="btn btn-sm btn-outline-primary ms-3" @click="openFilterModal">
+                    <button v-if="showFilter" class="btn btn-sm btn-outline-primary ms-3" @click="openFilterModal">
                         手动筛选
                     </button>
                 </div>
@@ -882,33 +898,33 @@ onBeforeUnmount(() => {
             <table class="stock-table">
                 <thead>
                     <tr>
-                        <th @click="handleSort('name')" class="sortable">
-                            股票<span class="sort-icon">{{ getSortIcon('name') }}</span>
+                        <th :class="{ 'sortable': showSort }" @click="showSort && handleSort('name')">
+                            股票<span v-if="showSort" class="sort-icon">{{ getSortIcon('name') }}</span>
                         </th>
-                        <th @click="handleSort('price')" class="sortable">
-                            最新价<span class="sort-icon">{{ getSortIcon('price') }}</span>
+                        <th :class="{ 'sortable': showSort }" @click="showSort && handleSort('price')">
+                            最新价<span v-if="showSort" class="sort-icon">{{ getSortIcon('price') }}</span>
                         </th>
-                        <th @click="handleSort('change_pct')" class="sortable">
-                            涨跌幅<span class="sort-icon">{{ getSortIcon('change_pct') }}</span>
+                        <th :class="{ 'sortable': showSort }" @click="showSort && handleSort('change_pct')">
+                            涨跌幅<span v-if="showSort" class="sort-icon">{{ getSortIcon('change_pct') }}</span>
                         </th>
-                        <th @click="handleSort('change')" class="sortable">
-                            涨跌额<span class="sort-icon">{{ getSortIcon('change') }}</span>
+                        <th :class="{ 'sortable': showSort }" @click="showSort && handleSort('change')">
+                            涨跌额<span v-if="showSort" class="sort-icon">{{ getSortIcon('change') }}</span>
                         </th>
-                        <th @click="handleSort('volume')" class="sortable">
-                            成交量(万)<span class="sort-icon">{{ getSortIcon('volume') }}</span>
+                        <th :class="{ 'sortable': showSort }" @click="showSort && handleSort('volume')">
+                            成交量(万)<span v-if="showSort" class="sort-icon">{{ getSortIcon('volume') }}</span>
                         </th>
-                        <th @click="handleSort('amount')" class="sortable">
-                            成交额(亿)<span class="sort-icon">{{ getSortIcon('amount') }}</span>
+                        <th :class="{ 'sortable': showSort }" @click="showSort && handleSort('amount')">
+                            成交额(亿)<span v-if="showSort" class="sort-icon">{{ getSortIcon('amount') }}</span>
                         </th>
-                        <th @click="handleSort('market_cap')" class="sortable">
-                            市值(亿)<span class="sort-icon">{{ getSortIcon('market_cap') }}</span>
+                        <th :class="{ 'sortable': showSort }" @click="showSort && handleSort('market_cap')">
+                            市值(亿)<span v-if="showSort" class="sort-icon">{{ getSortIcon('market_cap') }}</span>
                         </th>
-                        <th>操作</th>
+                        <th v-if="showActions">操作</th>
                     </tr>
                 </thead>
                 <tbody>
                     <template v-for="stock in sortedStocks" :key="stock.code">
-                        <tr class="stock-row" @click="toggleRow(stock)">
+                        <tr class="stock-row" @click="showKline && toggleRow(stock)">
                             <td>
                                 <div class="stock-info">
                                     <span class="stock-name">{{ stock.name }}</span>
@@ -927,14 +943,14 @@ onBeforeUnmount(() => {
                             <td>{{ formatVolume(stock.volume) }}</td>
                             <td>{{ formatAmount(stock.amount) }}</td>
                             <td>{{ formatMarketCap(stock.market_cap) }}</td>
-                            <td class="action">
+                            <td v-if="showActions" class="action">
                                 <button class="btn btn-sm btn-primary" @click.stop="analyzeStock(stock)">
                                     AI分析
                                 </button>
                             </td>
                         </tr>
-                        <tr v-if="expandedRow === stock.code" class="expanded-row">
-                            <td colspan="8">
+                        <tr v-if="showKline && expandedRow === stock.code" class="expanded-row">
+                            <td :colspan="showActions ? 8 : 7">
                                 <div class="kline-container">
                                     <div v-if="klineLoading" class="kline-loading">
                                         <div class="spinner"></div>

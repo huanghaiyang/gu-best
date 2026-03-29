@@ -80,7 +80,7 @@ def health_check():
 @app.route('/api/stocks/sectors', methods=['GET'])
 def get_sectors():
     try:
-        sectors = stock_service.get_hot_sectors()
+        sectors = stock_service.get_sectors()
         return jsonify({'success': True, 'data': sectors})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
