@@ -323,7 +323,6 @@ const saveAllSettings = async () => {
         isModelChanged.value = false;
         isModelConfigChanged.value = false;
 
-        closeSettingsPanel();
         toast.success('设置已保存');
     } catch (error) {
         console.error('保存设置失败:', error);
@@ -743,6 +742,7 @@ onUnmounted(() => {
 <style scoped>
 /* 模型测试 */
 .model-test-section {
+    margin-top: 20px;
     margin-bottom: 30px;
 }
 

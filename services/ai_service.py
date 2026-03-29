@@ -114,11 +114,12 @@ class AIService:
                     
             elif self.model == 'volcengine':
                 headers['Authorization'] = f"Bearer {self.api_config.get('apiKey')}"
+                # 豆包API的正确请求格式（Responses API）
                 data = {
                     'model': self.api_config.get('model'),
-                    'messages': messages,
-                    'temperature': temperature,
-                    'max_tokens': max_tokens
+                    'input': messages,
+                    'max_output_tokens': max_tokens,
+                    'temperature': temperature
                 }
                 response = requests.post(
                     self.api_config.get('apiUrl'),
@@ -451,7 +452,14 @@ class AIService:
             elif model == 'ernie':
                 response_text = response_data['result']
             elif model == 'volcengine':
-                response_text = response_data['choices'][0]['message']['content']
+                # 解析Responses API的响应格式
+                for item in response_data.get('output', []):
+                    if item.get('type') == 'message' and item.get('role') == 'assistant':
+                        for content_item in item.get('content', []):
+                            if content_item.get('type') == 'output_text':
+                                response_text = content_item.get('text')
+                                break
+                        break
             else:
                 return {'status': 'error', 'message': f'不支持的模型类型: {model}'}
             

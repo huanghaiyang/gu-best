@@ -22,8 +22,9 @@ class SecurityService:
         """验证股票代码格式"""
         if SecurityService.is_empty(code):
             return False
-        # 股票代码格式：数字或字母，长度4-10
-        pattern = r'^[A-Z0-9]{4,10}$'
+        # 股票代码格式：字母或数字，长度1-10
+        # 支持纯数字（如A股代码）、纯字母（如美股代码）或字母数字组合
+        pattern = r'^[A-Z0-9]{1,10}$'
         return bool(re.match(pattern, code, re.IGNORECASE))
     
     @staticmethod

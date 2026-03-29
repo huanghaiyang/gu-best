@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "股票分析平台 - Python后端 + Vue前端",
   "scripts": {
-    "dev": "npm run db:check && concurrently \"npm run python:dev\" \"npm run client:dev\"",
+    "dev": "npm run db:check && concurrently \"npm run python:dev\" \"npm run client:dev\" npm run test:dev",
     "python:dev": "python app.py",
     "python:prod": "npm run db:check && python app.py",
     "client:dev": "vite",
@@ -17,7 +17,9 @@
     "db:init": "python scripts/db_manage.py init",
     "db:reset": "python scripts/db_manage.py reset",
     "db:dump": "python scripts/db_manage.py dump",
-    "db:check": "python scripts/db_manage.py check"
+    "db:check": "python scripts/db_manage.py check",
+    "test": "npm run db:check && python test/run_tests.py",
+    "test:dev": "concurrently \"npm run python:dev\" \"sleep 3 && python test/run_tests.py\""
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^4.5.2",
