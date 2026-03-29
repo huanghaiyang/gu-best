@@ -7,6 +7,7 @@ import PageContainer from './page-container.vue';
 import api from '../api.js';
 import { startMarketStatusCheck, stopMarketStatusCheck } from '../store/marketStatus.js';
 import { useAutoRefresh } from '../hooks/useAutoRefresh.js';
+import toast from '../utils/toast.js';
 
 const sectors = ref([]);
 const stocks = ref([]);
@@ -57,6 +58,7 @@ const loadIndexData = async () => {
         }
     } catch (error) {
         console.error('加载指数数据失败:', error);
+        toast.error('加载指数数据失败: ' + error.message);
     }
 };
 
@@ -69,6 +71,7 @@ const loadSectors = async () => {
         }
     } catch (error) {
         console.error('加载板块失败:', error);
+        toast.error('加载板块失败: ' + error.message);
     }
     sectorsLoading.value = false;
 };
@@ -82,6 +85,7 @@ const loadStocks = async (topN = 10) => {
         }
     } catch (error) {
         console.error('加载股票失败:', error);
+        toast.error('加载股票失败: ' + error.message);
     }
     stocksLoading.value = false;
 };

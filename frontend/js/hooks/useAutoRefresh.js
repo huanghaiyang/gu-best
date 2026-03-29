@@ -1,5 +1,6 @@
 import { ref, onBeforeUnmount } from 'vue';
 import { isMarketOpen } from '../store/marketStatus.js';
+import toast from '../utils/toast.js';
 
 export function useAutoRefresh(callback, options = {}) {
     const {
@@ -20,6 +21,7 @@ export function useAutoRefresh(callback, options = {}) {
             await callback();
         } catch (error) {
             console.error('自动刷新失败:', error);
+            toast.error('自动刷新失败: ' + error.message);
         }
     };
 

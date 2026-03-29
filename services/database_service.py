@@ -2,6 +2,7 @@ import sqlite3
 import json
 from typing import Optional, List, Dict, Any
 from config import db_path
+from services.encryption_service import encryption_service
 
 class DatabaseService:
     def __init__(self, db_path: str = db_path):
@@ -115,11 +116,15 @@ class DatabaseService:
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
             try:
+                # 加密敏感信息
+                encrypted_api_key = encryption_service.encrypt(api_key) if api_key else None
+                encrypted_secret_key = encryption_service.encrypt(secret_key) if secret_key else None
+                
                 cursor.execute('''
                     INSERT OR REPLACE INTO ai_settings 
                     (modelId, modelName, apiUrl, apiKey, secretKey, temperature, maxTokens, isActive, updatedAt)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
-                ''', (model_id, model_name, api_url, api_key, secret_key, temperature, max_tokens, is_active))
+                ''', (model_id, model_name, api_url, encrypted_api_key, encrypted_secret_key, temperature, max_tokens, is_active))
                 conn.commit()
                 return True
             except Exception as e:
@@ -144,11 +149,15 @@ class DatabaseService:
                     update_fields.append('apiUrl = ?')
                     update_values.append(api_url)
                 if api_key is not None:
+                    # 加密 API Key
+                    encrypted_api_key = encryption_service.encrypt(api_key) if api_key else None
                     update_fields.append('apiKey = ?')
-                    update_values.append(api_key)
+                    update_values.append(encrypted_api_key)
                 if secret_key is not None:
+                    # 加密 Secret Key
+                    encrypted_secret_key = encryption_service.encrypt(secret_key) if secret_key else None
                     update_fields.append('secretKey = ?')
-                    update_values.append(secret_key)
+                    update_values.append(encrypted_secret_key)
                 if temperature is not None:
                     update_fields.append('temperature = ?')
                     update_values.append(temperature)
@@ -186,12 +195,16 @@ class DatabaseService:
             ''', (model_id,))
             result = cursor.fetchone()
             if result:
+                # 解密敏感信息
+                decrypted_api_key = encryption_service.decrypt(result[3]) if result[3] else None
+                decrypted_secret_key = encryption_service.decrypt(result[4]) if result[4] else None
+                
                 return {
                     'modelId': result[0],
                     'modelName': result[1],
                     'apiUrl': result[2],
-                    'apiKey': result[3],
-                    'secretKey': result[4],
+                    'apiKey': decrypted_api_key,
+                    'secretKey': decrypted_secret_key,
                     'temperature': result[5],
                     'maxTokens': result[6],
                     'isActive': result[7],
@@ -212,12 +225,16 @@ class DatabaseService:
             results = cursor.fetchall()
             ai_settings = []
             for result in results:
+                # 解密敏感信息
+                decrypted_api_key = encryption_service.decrypt(result[3]) if result[3] else None
+                decrypted_secret_key = encryption_service.decrypt(result[4]) if result[4] else None
+                
                 ai_settings.append({
                     'modelId': result[0],
                     'modelName': result[1],
                     'apiUrl': result[2],
-                    'apiKey': result[3],
-                    'secretKey': result[4],
+                    'apiKey': decrypted_api_key,
+                    'secretKey': decrypted_secret_key,
                     'temperature': result[5],
                     'maxTokens': result[6],
                     'isActive': result[7],
@@ -238,12 +255,16 @@ class DatabaseService:
             ''')
             result = cursor.fetchone()
             if result:
+                # 解密敏感信息
+                decrypted_api_key = encryption_service.decrypt(result[3]) if result[3] else None
+                decrypted_secret_key = encryption_service.decrypt(result[4]) if result[4] else None
+                
                 return {
                     'modelId': result[0],
                     'modelName': result[1],
                     'apiUrl': result[2],
-                    'apiKey': result[3],
-                    'secretKey': result[4],
+                    'apiKey': decrypted_api_key,
+                    'secretKey': decrypted_secret_key,
                     'temperature': result[5],
                     'maxTokens': result[6],
                     'isActive': result[7],

@@ -3,12 +3,12 @@ const API_BASE = '/api';
 const api = {
     async getHealth() {
         const response = await fetch(`${API_BASE}/health`);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async getSectors() {
         const response = await fetch(`${API_BASE}/stocks/sectors`);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async getLeaderStocks(sector = null, topN = 10) {
@@ -17,22 +17,22 @@ const api = {
             url += `&sector=${sector}`;
         }
         const response = await fetch(url);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async searchStock(query) {
         const response = await fetch(`${API_BASE}/stocks/search?query=${encodeURIComponent(query)}`);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async getIndexData() {
         const response = await fetch(`${API_BASE}/stocks/index`);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async getKlineData(code) {
         const response = await fetch(`${API_BASE}/stocks/kline?code=${code}`);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async analyzeStock(stockCode, stockName, stockData) {
@@ -45,7 +45,7 @@ const api = {
                 stock_data: stockData
             })
         });
-        return response.json();
+        return await handleResponse(response);
     },
 
     async batchAnalyzeStocks(stocks) {
@@ -54,13 +54,13 @@ const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ stocks })
         });
-        return response.json();
+        return await handleResponse(response);
     },
 
     async getRealtimeQuote(code) {
         try {
             const response = await fetch(`${API_BASE}/stocks/quote?code=${code}`);
-            return response.json();
+            return await handleResponse(response);
         } catch (error) {
             console.error('获取实时行情失败:', error);
             // 模拟实时数据
@@ -80,12 +80,12 @@ const api = {
     // 数据库相关API
     async getSettings() {
         const response = await fetch(`${API_BASE}/db/settings`);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async getSetting(key) {
         const response = await fetch(`${API_BASE}/db/settings/${key}`);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async setSetting(key, value) {
@@ -94,12 +94,12 @@ const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ key, value })
         });
-        return response.json();
+        return await handleResponse(response);
     },
 
     async getWatchlist() {
         const response = await fetch(`${API_BASE}/db/watchlist`);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async addToWatchlist(code, name) {
@@ -108,21 +108,21 @@ const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ code, name })
         });
-        return response.json();
+        return await handleResponse(response);
     },
 
     async removeFromWatchlist(code) {
         const response = await fetch(`${API_BASE}/db/watchlist/${code}`, {
             method: 'DELETE'
         });
-        return response.json();
+        return await handleResponse(response);
     },
 
     async clearWatchlist() {
         const response = await fetch(`${API_BASE}/db/watchlist`, {
             method: 'DELETE'
         });
-        return response.json();
+        return await handleResponse(response);
     },
 
     // 模型测试API
@@ -132,23 +132,23 @@ const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(testData)
         });
-        return response.json();
+        return await handleResponse(response);
     },
 
     // AI设置相关API
     async getAISettings() {
         const response = await fetch(`${API_BASE}/ai/settings`);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async getAISetting(modelId) {
         const response = await fetch(`${API_BASE}/ai/settings/${modelId}`);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async getActiveAISetting() {
         const response = await fetch(`${API_BASE}/ai/settings/active`);
-        return response.json();
+        return await handleResponse(response);
     },
 
     async addAISetting(settingData) {
@@ -157,7 +157,7 @@ const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settingData)
         });
-        return response.json();
+        return await handleResponse(response);
     },
 
     async updateAISetting(modelId, settingData) {
@@ -166,28 +166,46 @@ const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(settingData)
         });
-        return response.json();
+        return await handleResponse(response);
     },
 
     async setActiveAIModel(modelId) {
         const response = await fetch(`${API_BASE}/ai/settings/active/${modelId}`, {
             method: 'PUT'
         });
-        return response.json();
+        return await handleResponse(response);
     },
 
     async deleteAISetting(modelId) {
         const response = await fetch(`${API_BASE}/ai/settings/${modelId}`, {
             method: 'DELETE'
         });
-        return response.json();
+        return await handleResponse(response);
     },
 
     // 获取AI模型列表
     async getAIModels() {
         const response = await fetch(`${API_BASE}/ai/models`);
-        return response.json();
+        return await handleResponse(response);
     }
 };
+
+async function handleResponse(response) {
+    if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Response is not JSON');
+    }
+    
+    try {
+        return await response.json();
+    } catch (error) {
+        console.error('JSON parse error:', error);
+        throw new Error('Failed to parse JSON response');
+    }
+}
 
 export default api;

@@ -3,6 +3,7 @@ import { ref, nextTick, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import api from '../api.js';
 import { startMarketStatusCheck, stopMarketStatusCheck } from '../store/marketStatus.js';
 import { useAutoRefresh } from '../hooks/useAutoRefresh.js';
+import toast from '../utils/toast.js';
 
 const props = defineProps({
     stocks: Array,
@@ -28,9 +29,12 @@ const { start: startKlineAutoRefresh, stop: stopKlineAutoRefresh } = useAutoRefr
                 requestAnimationFrame(() => {
                     renderKlineChart(currentStock.value);
                 });
+            } else {
+                toast.error('刷新K线数据失败: ' + (data.error || '未知错误'));
             }
         } catch (error) {
             console.error('刷新K线数据失败:', error);
+            toast.error('刷新K线数据失败: ' + error.message);
         }
     }
 }, {
@@ -119,10 +123,11 @@ const toggleRow = async (stock) => {
                 });
                 startKlineAutoRefresh();
             } else {
-                console.error('获取K线数据失败:', data.error);
+                toast.error('获取K线数据失败: ' + (data.error || '未知错误'));
             }
         } catch (error) {
             console.error('加载K线数据失败:', error);
+            toast.error('加载K线数据失败: ' + error.message);
         }
         klineLoading.value = false;
     }

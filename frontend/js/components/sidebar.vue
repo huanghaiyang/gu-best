@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import _ from 'lodash';
 import api from '../api.js';
+import toast from '../utils/toast.js';
 
 const emit = defineEmits(['navigate']);
 
@@ -323,10 +324,10 @@ const saveAllSettings = async () => {
         isModelConfigChanged.value = false;
 
         closeSettingsPanel();
-        alert('设置已保存');
+        toast.success('设置已保存');
     } catch (error) {
         console.error('保存设置失败:', error);
-        alert('保存设置失败，请稍后重试');
+        toast.error('保存设置失败，请稍后重试: ' + error.message);
     }
 };
 

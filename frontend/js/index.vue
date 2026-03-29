@@ -6,6 +6,7 @@ import SearchPage from './components/search-page.vue';
 import PortfolioPage from './components/portfolio-page.vue';
 import AnalysisModal from './components/analysis-modal.vue';
 import api from './api.js';
+import toast from './utils/toast.js';
 
 const tabs = ref([]);
 const activeTab = ref(null);
@@ -92,9 +93,13 @@ const analyzeStock = async (stock) => {
         const data = await api.analyzeStock(stock.code, stock.name, stock);
         if (data.success) {
             currentAnalysis.value = data.data;
+            toast.success('股票分析完成');
+        } else {
+            toast.error('股票分析失败: ' + (data.error || '未知错误'));
         }
     } catch (error) {
         console.error('分析失败:', error);
+        toast.error('股票分析失败: ' + error.message);
     }
     modalLoading.value = false;
 };
