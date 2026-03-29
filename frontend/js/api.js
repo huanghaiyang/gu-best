@@ -1,6 +1,40 @@
 const API_BASE = '/api';
 
+// CSRF令牌管理
+let csrfToken = null;
+let csrfTokenTimestamp = null;
+const CSRF_TOKEN_EXPIRY = 3600; // 令牌有效期（秒）
+
 const api = {
+    async getCSRFToken() {
+        try {
+            const response = await fetch(`${API_BASE}/csrf-token`);
+            const data = await response.json();
+            if (data.success) {
+                csrfToken = data.token;
+                csrfTokenTimestamp = Math.floor(Date.now() / 1000);
+            }
+            return csrfToken;
+        } catch (error) {
+            console.error('获取CSRF令牌失败:', error);
+            return null;
+        }
+    },
+    
+    isCSRFTokenValid() {
+        if (!csrfToken || !csrfTokenTimestamp) {
+            return false;
+        }
+        const currentTime = Math.floor(Date.now() / 1000);
+        return (currentTime - csrfTokenTimestamp) < CSRF_TOKEN_EXPIRY;
+    },
+    
+    async ensureCSRFToken() {
+        if (!this.isCSRFTokenValid()) {
+            return await this.getCSRFToken();
+        }
+        return csrfToken;
+    },
     async getHealth() {
         const response = await fetch(`${API_BASE}/health`);
         return await handleResponse(response);
@@ -36,23 +70,35 @@ const api = {
     },
 
     async analyzeStock(stockCode, stockName, stockData) {
+        await this.ensureCSRFToken();
         const response = await fetch(`${API_BASE}/stocks/analyze`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
             body: JSON.stringify({
                 stock_code: stockCode,
                 stock_name: stockName,
-                stock_data: stockData
+                stock_data: stockData,
+                csrf_token: csrfToken
             })
         });
         return await handleResponse(response);
     },
 
     async batchAnalyzeStocks(stocks) {
+        await this.ensureCSRFToken();
         const response = await fetch(`${API_BASE}/stocks/batch-analyze`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ stocks })
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({ 
+                stocks,
+                csrf_token: csrfToken
+            })
         });
         return await handleResponse(response);
     },
@@ -89,10 +135,18 @@ const api = {
     },
 
     async setSetting(key, value) {
+        await this.ensureCSRFToken();
         const response = await fetch(`${API_BASE}/db/settings`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ key, value })
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({ 
+                key, 
+                value,
+                csrf_token: csrfToken
+            })
         });
         return await handleResponse(response);
     },
@@ -103,34 +157,57 @@ const api = {
     },
 
     async addToWatchlist(code, name) {
+        await this.ensureCSRFToken();
         const response = await fetch(`${API_BASE}/db/watchlist`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ code, name })
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({ 
+                code, 
+                name,
+                csrf_token: csrfToken
+            })
         });
         return await handleResponse(response);
     },
 
     async removeFromWatchlist(code) {
+        await this.ensureCSRFToken();
         const response = await fetch(`${API_BASE}/db/watchlist/${code}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 
+                'X-CSRF-Token': csrfToken
+            }
         });
         return await handleResponse(response);
     },
 
     async clearWatchlist() {
+        await this.ensureCSRFToken();
         const response = await fetch(`${API_BASE}/db/watchlist`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 
+                'X-CSRF-Token': csrfToken
+            }
         });
         return await handleResponse(response);
     },
 
     // 模型测试API
     async testModel(testData) {
+        await this.ensureCSRFToken();
         const response = await fetch(`${API_BASE}/ai/test-model`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(testData)
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({
+                ...testData,
+                csrf_token: csrfToken
+            })
         });
         return await handleResponse(response);
     },
@@ -152,33 +229,55 @@ const api = {
     },
 
     async addAISetting(settingData) {
+        await this.ensureCSRFToken();
         const response = await fetch(`${API_BASE}/ai/settings`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settingData)
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({
+                ...settingData,
+                csrf_token: csrfToken
+            })
         });
         return await handleResponse(response);
     },
 
     async updateAISetting(modelId, settingData) {
+        await this.ensureCSRFToken();
         const response = await fetch(`${API_BASE}/ai/settings/${modelId}`, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(settingData)
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({
+                ...settingData,
+                csrf_token: csrfToken
+            })
         });
         return await handleResponse(response);
     },
 
     async setActiveAIModel(modelId) {
+        await this.ensureCSRFToken();
         const response = await fetch(`${API_BASE}/ai/settings/active/${modelId}`, {
-            method: 'PUT'
+            method: 'PUT',
+            headers: { 
+                'X-CSRF-Token': csrfToken
+            }
         });
         return await handleResponse(response);
     },
 
     async deleteAISetting(modelId) {
+        await this.ensureCSRFToken();
         const response = await fetch(`${API_BASE}/ai/settings/${modelId}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 
+                'X-CSRF-Token': csrfToken
+            }
         });
         return await handleResponse(response);
     },
