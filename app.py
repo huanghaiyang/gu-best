@@ -25,9 +25,12 @@ CORS(app,
      }
 )
 
-stock_service = StockService()
-ai_service = AIService()
 db_service = DatabaseService()
+ai_service = AIService()
+
+# 从数据库获取默认数据源
+default_data_source = db_service.get_setting('dataSource') or 'akshare'
+stock_service = StockService(provider_type=default_data_source)
 
 def csrf_protected(f):
     """CSRF保护装饰器"""
@@ -263,6 +266,30 @@ def get_settings():
     try:
         settings = db_service.get_all_settings()
         return jsonify({'success': True, 'data': settings})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/db/settings/data-source', methods=['POST'])
+@csrf_protected
+def set_data_source():
+    try:
+        data = request.get_json()
+        if not data or 'dataSource' not in data:
+            return jsonify({'success': False, 'error': '缺少数据源参数'}), 400
+        
+        data_source = data['dataSource']
+        # 验证数据源类型是否有效
+        valid_sources = ['akshare', 'eastmoney']
+        if data_source not in valid_sources:
+            return jsonify({'success': False, 'error': '无效的数据源类型'}), 400
+        
+        # 更新数据库中的数据源设置
+        db_service.set_setting('dataSource', data_source)
+        
+        # 切换StockService的数据源
+        stock_service.set_provider(data_source)
+        
+        return jsonify({'success': True, 'data': {'dataSource': data_source}})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

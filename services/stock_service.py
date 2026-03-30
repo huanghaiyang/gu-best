@@ -3,7 +3,8 @@ from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 import requests
 from config import stock_filter_config
-from services.eastmoney_api import EastmoneyAPI
+from services.stock_data_factory import StockDataFactory
+from services.stock_data_provider import StockDataProvider
 
 MARKET_NAMES = {
     'sh': '沪',
@@ -64,9 +65,25 @@ def get_sector_category(sector_name: str) -> str:
 
 
 class StockService:
-    def __init__(self):
+    def __init__(self, provider_type: str = 'akshare'):
         self.config = stock_filter_config
-        self.eastmoney_api = EastmoneyAPI()
+        self.provider_type = provider_type
+        self.provider = StockDataFactory.create_provider(provider_type)
+        if not self.provider:
+            raise Exception(f"无法创建股票数据提供者: {provider_type}")
+    
+    def set_provider(self, provider_type: str):
+        """设置数据源提供者
+        
+        Args:
+            provider_type: 提供者类型，支持 'eastmoney' 或 'akshare'
+        """
+        new_provider = StockDataFactory.create_provider(provider_type)
+        if new_provider:
+            self.provider_type = provider_type
+            self.provider = new_provider
+            return True
+        return False
 
     def search_stocks(self, query: str) -> List[Dict]:
         if not query or len(query.strip()) < 2:
@@ -88,7 +105,7 @@ class StockService:
         """通过股票代码搜索"""
         try:
             # 直接调用 get_stock_quote 获取股票信息
-            quote = self.eastmoney_api.get_stock_quote(code)
+            quote = self.provider.get_stock_quote(code)
             if quote:
                 return [quote]
             else:
@@ -100,10 +117,9 @@ class StockService:
     def _search_by_name(self, name: str) -> List[Dict]:
         """通过股票名称搜索"""
         try:
-            # 由于东方财富搜索API已不可用，暂时返回空列表
-            # 用户可以使用股票代码进行搜索
-            print(f"通过名称搜索功能暂时不可用，请使用股票代码搜索")
-            return []
+            # 使用抽象接口搜索股票
+            results = self.provider.search_stocks(name)
+            return results
         except Exception as e:
             print(f"通过名称搜索股票失败: {e}")
             return []
@@ -116,10 +132,10 @@ class StockService:
             return []
 
     def _get_real_sectors(self) -> List[Dict]:
-        # 调用东方财富API获取板块数据
+        # 调用抽象接口获取板块数据
         # 同时获取行业板块和概念板块
-        industry_sectors = self.eastmoney_api.get_sectors(sector_type='industry')
-        concept_sectors = self.eastmoney_api.get_sectors(sector_type='concept')
+        industry_sectors = self.provider.get_sectors(sector_type='industry')
+        concept_sectors = self.provider.get_sectors(sector_type='concept')
         
         sectors = []
         
@@ -167,7 +183,7 @@ class StockService:
             return []
 
     def _get_real_sector_stocks(self, sector_code: str) -> List[Dict]:
-        items = self.eastmoney_api.get_sector_stocks(sector_code, 100)
+        items = self.provider.get_sector_stocks(sector_code, 100)
 
         stocks = []
         if items:
@@ -210,7 +226,7 @@ class StockService:
 
         for fs, market_name in market_configs:
             try:
-                items = self.eastmoney_api.get_all_stocks(fs, 500)
+                items = self.provider.get_all_stocks(fs, 500)
 
                 if items:
                     for item in items:
@@ -282,7 +298,7 @@ class StockService:
             return {'code': stock_code, 'name': '', 'industry': '', 'market': get_market_label(stock_code)}
 
     def _get_real_stock_detail(self, stock_code: str) -> Dict:
-        item = self.eastmoney_api.get_stock_detail(stock_code)
+        item = self.provider.get_stock_detail(stock_code)
 
         if item:
             return {
@@ -307,7 +323,7 @@ class StockService:
         end_date = datetime.now().strftime('%Y%m%d')
         start_date = (datetime.now() - timedelta(days=days*2)).strftime('%Y%m%d')
 
-        klines = self.eastmoney_api.get_stock_history(stock_code, start_date, end_date)
+        klines = self.provider.get_stock_history(stock_code, start_date, end_date)
 
         history = []
         if klines:
@@ -344,7 +360,7 @@ class StockService:
 
         for key, secid in index_codes:
             try:
-                item = self.eastmoney_api.get_index_data(secid)
+                item = self.provider.get_index_data(secid)
 
                 if item:
                     indexes[key]['price'] = item.get('price', 0)

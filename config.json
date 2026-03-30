@@ -11,5 +11,21 @@
     "min_turnover_rate": 3.0,
     "min_change": 2.0,
     "top_n_stocks": 20
+  },
+  "DEFAULT_DATA_SETTINGS": {
+    "autoRefresh": true,
+    "refreshInterval": 30,
+    "dataSource": "akshare"
+  },
+  "DEFAULT_DISPLAY_SETTINGS": {
+    "theme": "light",
+    "showVolume": true,
+    "showMarketCap": true,
+    "sortBy": "change_pct"
+  },
+  "DEFAULT_NOTIFY_SETTINGS": {
+    "enableNotification": false,
+    "notificationThreshold": 5.0,
+    "notificationSound": true
   }
 }

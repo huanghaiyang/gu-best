@@ -311,6 +311,12 @@ const saveAllSettings = async () => {
             promises.push(api.updateAISetting(selectedModel.value, updateData));
         }
 
+        // 3. 如果数据源有修改，立即切换数据源
+        if (dataSettings.value.dataSource) {
+            // 调用数据源切换API
+            await api.setDataSource(dataSettings.value.dataSource);
+        }
+
         // 4. 其他设置（dataSettings, notifySettings, displaySettings）
         // 这些设置改动较少，每次保存时都更新
         promises.push(api.setSetting('dataSettings', dataSettings.value));
@@ -604,6 +610,7 @@ onUnmounted(() => {
                                     <i class="bi bi-database me-2"></i>数据源
                                 </div>
                                 <select class="form-select setting-input" v-model="dataSettings.dataSource">
+                                    <option value="akshare">Akshare</option>
                                     <option value="eastmoney">东方财富</option>
                                     <option value="sina">新浪财经</option>
                                     <option value="tushare">Tushare</option>

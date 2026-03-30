@@ -286,6 +286,23 @@ const api = {
     async getAIModels() {
         const response = await fetch(`${API_BASE}/ai/models`);
         return await handleResponse(response);
+    },
+    
+    // 数据源切换API
+    async setDataSource(dataSource) {
+        await this.ensureCSRFToken();
+        const response = await fetch(`${API_BASE}/db/settings/data-source`, {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-CSRF-Token': csrfToken
+            },
+            body: JSON.stringify({
+                dataSource,
+                csrf_token: csrfToken
+            })
+        });
+        return await handleResponse(response);
     }
 };
 

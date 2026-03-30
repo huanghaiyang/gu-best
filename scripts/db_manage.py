@@ -11,7 +11,7 @@ import json
 # 添加项目根目录到Python路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from config import db_path, default_ai_config_file, default_model_id
+from config import db_path, default_ai_config_file, default_model_id, default_data_settings, default_display_settings, default_notify_settings
 
 def clear_database():
     """清除数据库文件"""
@@ -150,6 +150,35 @@ def init_database():
             
             # 初始化AI配置
             init_ai_settings(conn)
+            
+            # 初始化默认设置
+            cursor = conn.cursor()
+            
+            # 写入默认数据设置
+            cursor.execute('''
+                INSERT OR REPLACE INTO settings (key, value) 
+                VALUES (?, ?)
+            ''', ('dataSettings', json.dumps(default_data_settings)))
+            
+            # 写入默认显示设置
+            cursor.execute('''
+                INSERT OR REPLACE INTO settings (key, value) 
+                VALUES (?, ?)
+            ''', ('displaySettings', json.dumps(default_display_settings)))
+            
+            # 写入默认通知设置
+            cursor.execute('''
+                INSERT OR REPLACE INTO settings (key, value) 
+                VALUES (?, ?)
+            ''', ('notifySettings', json.dumps(default_notify_settings)))
+            
+            # 写入默认数据源设置
+            cursor.execute('''
+                INSERT OR REPLACE INTO settings (key, value) 
+                VALUES (?, ?)
+            ''', ('dataSource', default_data_settings.get('dataSource', 'akshare')))
+            
+            conn.commit()
         
         print(f"✓ 数据库已初始化: '{db_path}'")
         
@@ -170,6 +199,21 @@ def init_database():
                 for setting in ai_settings:
                     active_mark = " [激活]" if setting[2] else ""
                     print(f"  - {setting[0]}: {setting[1]}{active_mark}")
+            
+            # 显示默认设置
+            cursor.execute("SELECT key, value FROM settings WHERE key IN ('dataSettings', 'displaySettings', 'notifySettings', 'dataSource');")
+            settings = cursor.fetchall()
+            if settings:
+                print(f"\n默认设置:")
+                for key, value in settings:
+                    if key == 'dataSource':
+                        print(f"  - {key}: {value}")
+                    else:
+                        try:
+                            setting_data = json.loads(value)
+                            print(f"  - {key}: {setting_data}")
+                        except:
+                            print(f"  - {key}: {value}")
         
         return True
     except Exception as e:
@@ -244,13 +288,13 @@ def dump_table(table_name=None):
                 print("(空表)")
             else:
                 # 打印表头
-                header = " | ".join(f"{name:<15}" for name in column_names)
+                header = " | ".join(f"{name:<30}" for name in column_names)
                 print(header)
                 print("-" * len(header))
                 
                 # 打印数据行
                 for row in rows:
-                    row_str = " | ".join(f"{str(val)[:15]:<15}" for val in row)
+                    row_str = " | ".join(f"{str(val):<30}" for val in row)
                     print(row_str)
                 
                 print(f"\n共 {len(rows)} 条记录")
