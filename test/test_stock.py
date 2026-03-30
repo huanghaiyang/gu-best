@@ -21,7 +21,7 @@ class TestStockService(unittest.TestCase):
     def test_search_stocks(self):
         """测试搜索股票"""
         # 测试代码搜索
-        result = self.stock_service.search_stocks('600000')
+        result = self.stock_service.search_stocks('600519')
         self.assertIsInstance(result, list)
         
         # 测试名称搜索
@@ -30,13 +30,13 @@ class TestStockService(unittest.TestCase):
     
     def test_get_hot_sectors(self):
         """测试获取热门板块"""
-        result = self.stock_service.get_hot_sectors()
+        result = self.stock_service.get_sectors()
         self.assertIsInstance(result, list)
     
     def test_get_sector_stocks(self):
         """测试获取板块成分股"""
         # 测试获取板块成分股
-        sectors = self.stock_service.get_hot_sectors()
+        sectors = self.stock_service.get_sectors()
         if sectors:
             sector_code = sectors[0].get('code')
             if sector_code:
@@ -55,14 +55,14 @@ class TestStockService(unittest.TestCase):
     
     def test_get_stock_detail(self):
         """测试获取股票详情"""
-        result = self.stock_service.get_stock_detail('600000')
+        result = self.stock_service.get_stock_detail('600519')
         self.assertIsInstance(result, dict)
         self.assertIn('code', result)
         self.assertIn('name', result)
     
     def test_get_stock_history(self):
         """测试获取股票历史数据"""
-        result = self.stock_service.get_stock_history('600000', days=7)
+        result = self.stock_service.get_stock_history('600519', days=7)
         self.assertIsInstance(result, list)
     
     def test_get_index_data(self):
@@ -76,7 +76,7 @@ class TestStockService(unittest.TestCase):
     
     def test_get_quote(self):
         """测试获取股票实时行情"""
-        result = self.stock_service.get_quote('600000')
+        result = self.stock_service.get_quote('600519')
         self.assertIsInstance(result, dict)
         self.assertIn('code', result)
         self.assertIn('name', result)

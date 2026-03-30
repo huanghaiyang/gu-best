@@ -124,6 +124,10 @@ const handleAnalyzeStock = (event) => {
 
 onMounted(() => {
     handleHashChange();
+    // 如果没有激活的标签页，默认打开龙头股票页面
+    if (!activeTab.value && tabs.value.length === 0) {
+        navigateTo('leader');
+    }
     window.addEventListener('hashchange', handleHashChange);
     window.addEventListener('analyze-stock', handleAnalyzeStock);
 });

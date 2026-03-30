@@ -182,7 +182,7 @@ def init_database():
 def check_database():
     """检查数据库是否存在，不存在则初始化"""
     if os.path.exists(db_path):
-        print(f"✓ 数据库已存在: '{db_path}'")
+        print("OK 数据库已存在: '" + db_path + "'")
         return True
     else:
         print(f"! 数据库不存在，正在初始化...")

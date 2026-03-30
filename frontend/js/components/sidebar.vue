@@ -334,6 +334,8 @@ onMounted(async () => {
     await loadModelSettings();
     await loadAllSettings();
     window.addEventListener('hashchange', handleHashChange);
+    // 主动调用一次handleHashChange，确保初始状态正确
+    handleHashChange();
 });
 
 onUnmounted(() => {
