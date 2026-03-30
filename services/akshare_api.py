@@ -15,6 +15,10 @@ class AkshareAPI(StockDataProvider):
     
     def get_stock_quote(self, code: str) -> Optional[Dict]:
         """获取股票实时行情"""
+        if not AKSHARE_AVAILABLE:
+            print("akshare未安装，无法获取股票实时行情")
+            return None
+            
         try:
             # 转换为akshare格式的代码
             ak_code = self._convert_code(code)
@@ -155,15 +159,52 @@ class AkshareAPI(StockDataProvider):
             return None
             
         try:
+            print(f"尝试获取{sector_type}类型板块数据...")
+            
+            # 尝试使用不同的函数名获取板块数据
             if sector_type == 'concept':
                 # 概念板块
-                df = ak.stock_board_concept_name_ths()
+                try:
+                    df = ak.stock_board_concept_name_ths()
+                    print(f"使用stock_board_concept_name_ths成功获取概念板块数据，共{len(df)}条")
+                except AttributeError:
+                    try:
+                        df = ak.stock_board_concept_index_ths()
+                        print(f"使用stock_board_concept_index_ths成功获取概念板块数据，共{len(df)}条")
+                    except Exception as e:
+                        print(f"获取概念板块数据失败: {e}")
+                        return None
             elif sector_type == 'industry':
                 # 行业板块
-                df = ak.stock_board_industry_name_ths()
+                try:
+                    df = ak.stock_board_industry_name_ths()
+                    print(f"使用stock_board_industry_name_ths成功获取行业板块数据，共{len(df)}条")
+                except AttributeError:
+                    try:
+                        df = ak.stock_board_industry_index_ths()
+                        print(f"使用stock_board_industry_index_ths成功获取行业板块数据，共{len(df)}条")
+                    except Exception as e:
+                        print(f"获取行业板块数据失败: {e}")
+                        return None
             else:
                 # 地域板块
-                df = ak.stock_board_area_name_ths()
+                try:
+                    df = ak.stock_board_area_name_ths()
+                    print(f"使用stock_board_area_name_ths成功获取地域板块数据，共{len(df)}条")
+                except Exception as e:
+                    print(f"获取地域板块数据失败: {e}")
+                    return None
+            
+            # 检查数据是否为空
+            if df.empty:
+                print(f"获取{sector_type}类型板块数据为空")
+                return None
+            
+            # 检查数据列是否存在
+            if '代码' not in df.columns or '名称' not in df.columns:
+                print(f"数据列不完整，缺少必要字段")
+                print(f"实际列: {list(df.columns)}")
+                return None
             
             result = []
             for _, row in df.head(page_size).iterrows():
@@ -179,9 +220,12 @@ class AkshareAPI(StockDataProvider):
                     'volume_ratio': 0  # 量比
                 })
             
+            print(f"成功处理{len(result)}个板块数据")
             return result
         except Exception as e:
             print(f"获取板块数据失败: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     def search_stocks(self, name: str) -> List[Dict]:

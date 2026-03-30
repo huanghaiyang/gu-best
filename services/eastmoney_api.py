@@ -14,6 +14,15 @@ from services.eastmoney_fields import (
 
 from services.stock_data_provider import StockDataProvider
 
+# 尝试导入东方财富API密钥
+import os
+try:
+    from eastmoney_keys import BASE_URL, UT_TOKEN_STOCK, UT_TOKEN_LIST, SEARCH_TOKEN, DEFAULT_TIMEOUT, LONG_TIMEOUT
+except ImportError:
+    print("错误: 东方财富密钥文件不存在，请创建eastmoney_keys.py文件")
+    print("请参考eastmoney_keys.py.template创建密钥文件")
+    exit(1)
+
 
 class EastmoneyAPI(StockDataProvider):
     """东方财富API封装"""
@@ -239,16 +248,19 @@ class EastmoneyAPI(StockDataProvider):
             print(f"获取指数数据失败: {e}")
             return None
 
-    BASE_URL = 'http://push2.eastmoney.com/api'
+    # 从配置文件导入API密钥
+    BASE_URL = BASE_URL
     HISTORY_URL = 'http://push2his.eastmoney.com/api'
 
-    UT_TOKEN_STOCK = 'fa5fd1943c7b386f172d6893dbfba10b'
-    UT_TOKEN_LIST = 'bd1d9ddb04089700cf9c27f6f7426281'
-    SEARCH_TOKEN = 'd41d8cd98f00b204e9800998ecf8427e'
+    # API访问令牌
+    UT_TOKEN_STOCK = UT_TOKEN_STOCK
+    UT_TOKEN_LIST = UT_TOKEN_LIST
+    SEARCH_TOKEN = SEARCH_TOKEN
 
-    DEFAULT_TIMEOUT = 10
+    # 超时设置（秒）
+    DEFAULT_TIMEOUT = DEFAULT_TIMEOUT
     SHORT_TIMEOUT = 5
-    LONG_TIMEOUT = 15
+    LONG_TIMEOUT = LONG_TIMEOUT
 
     def __init__(self):
         self.session = requests.Session()

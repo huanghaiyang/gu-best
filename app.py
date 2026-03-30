@@ -5,9 +5,15 @@ from services.ai_service import AIService
 from services.database_service import DatabaseService
 from services.csrf_service import csrf_service
 from services.security_service import security_service
+from services.dependency_checker import run_all_checks, print_check_results
 from config import stock_filter_config
 
 app = Flask(__name__, static_folder='frontend', static_url_path='')
+
+# 运行依赖检查
+print("\n正在进行服务启动依赖检查...")
+checks = run_all_checks()
+print_check_results(checks)
 
 # 配置会话密钥
 app.secret_key = 'stock_analysis_session_secret_2024'
@@ -30,7 +36,14 @@ ai_service = AIService()
 
 # 从数据库获取默认数据源
 default_data_source = db_service.get_setting('dataSource') or 'akshare'
-stock_service = StockService(provider_type=default_data_source)
+
+# 尝试创建StockService，如果akshare不可用则使用eastmoney
+try:
+    stock_service = StockService(provider_type=default_data_source)
+except Exception as e:
+    print(f"创建StockService失败: {e}")
+    print("尝试使用eastmoney作为数据源")
+    stock_service = StockService(provider_type='eastmoney')
 
 def csrf_protected(f):
     """CSRF保护装饰器"""

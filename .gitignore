@@ -45,3 +45,9 @@ __pycache__/
 *.db
 *.sqlite
 *.sqlite3
+
+# 数据目录
+data/
+
+# 密钥文件
+eastmoney_keys.py
