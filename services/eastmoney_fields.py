@@ -138,6 +138,16 @@ SECTOR_FIELDS = {
     'f12': {'name': 'code', 'desc': '板块代码', 'unit': None},
     'f14': {'name': 'name', 'desc': '板块名称', 'unit': None},
     'f3': {'name': 'change_pct', 'desc': '涨跌幅', 'unit': '%', 'divisor': 1},
+    'f2': {'name': 'price', 'desc': '最新价', 'unit': '元', 'divisor': 1},
+    'f4': {'name': 'change', 'desc': '涨跌额', 'unit': '元', 'divisor': 1},
+    'f5': {'name': 'volume', 'desc': '成交量', 'unit': '手', 'divisor': 1},
+    'f6': {'name': 'amount', 'desc': '成交额', 'unit': '元', 'divisor': 1},
+    'f8': {'name': 'turnover_rate', 'desc': '换手率', 'unit': '%', 'divisor': 1},
+    'f10': {'name': 'volume_ratio', 'desc': '量比', 'unit': '倍', 'divisor': 1},
+    'f15': {'name': 'high', 'desc': '最高价', 'unit': '元', 'divisor': 1},
+    'f16': {'name': 'low', 'desc': '最低价', 'unit': '元', 'divisor': 1},
+    'f17': {'name': 'open', 'desc': '开盘价', 'unit': '元', 'divisor': 1},
+    'f18': {'name': 'prev_close', 'desc': '昨收', 'unit': '元', 'divisor': 1},
 }
 
 # ============================================

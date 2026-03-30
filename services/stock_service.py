@@ -117,11 +117,15 @@ class StockService:
 
     def _get_real_sectors(self) -> List[Dict]:
         # 调用东方财富API获取板块数据
-        sectors_data = self.eastmoney_api.get_sectors()
+        # 同时获取行业板块和概念板块
+        industry_sectors = self.eastmoney_api.get_sectors(sector_type='industry')
+        concept_sectors = self.eastmoney_api.get_sectors(sector_type='concept')
         
         sectors = []
-        if sectors_data:
-            for item in sectors_data:
+        
+        # 处理行业板块
+        if industry_sectors:
+            for item in industry_sectors:
                 sector_code = item.get('code', '')
                 sector_name = item.get('name', '')
 
@@ -132,6 +136,22 @@ class StockService:
                     'leading_stock': '',
                     'leading_stock_code': '',
                     'type': 'industry',
+                    'category': get_sector_category(sector_name)
+                })
+        
+        # 处理概念板块
+        if concept_sectors:
+            for item in concept_sectors:
+                sector_code = item.get('code', '')
+                sector_name = item.get('name', '')
+
+                sectors.append({
+                    'code': sector_code,
+                    'name': sector_name + '(概念)',
+                    'change_pct': float(item.get('change_pct', 0) or 0),
+                    'leading_stock': '',
+                    'leading_stock_code': '',
+                    'type': 'concept',
                     'category': get_sector_category(sector_name)
                 })
 

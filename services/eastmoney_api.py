@@ -203,30 +203,50 @@ class EastmoneyAPI:
 
     def get_all_stocks(self, fs: str, page_size: int = 500) -> Optional[List]:
         """获取所有股票"""
-        try:
-            url = f'{self.BASE_URL}/qt/clist/get'
-            params = self._get_list_params(
-                fs=fs,
-                page_size=page_size,
-                fields=LIST_FIELDS_FULL
-            )
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                url = f'{self.BASE_URL}/qt/clist/get'
+                params = self._get_list_params(
+                    fs=fs,
+                    page_size=page_size,
+                    fields=LIST_FIELDS_FULL
+                )
 
-            response = self.session.get(url, params=params, timeout=self.LONG_TIMEOUT)
-            data = response.json()
+                response = self.session.get(url, params=params, timeout=self.LONG_TIMEOUT)
+                
+                # 检查响应状态码
+                if response.status_code != 200:
+                    print(f"获取所有股票失败: 状态码 {response.status_code}")
+                    retry_count += 1
+                    continue
+                
+                data = response.json()
+                
+                # 检查API返回的错误码
+                if data.get('rc') != 0:
+                    print(f"获取所有股票失败: API错误码 {data.get('rc')}")
+                    retry_count += 1
+                    continue
 
-            if data and 'data' in data and 'diff' in data['data']:
-                items = data['data']['diff']
-                # 解析每个股票的字段
-                result = []
-                for item in items:
-                    parsed = parse_eastmoney_data(item, STOCK_LIST_FIELDS)
-                    result.append(parsed)
-                return result
+                if data and 'data' in data and 'diff' in data['data']:
+                    items = data['data']['diff']
+                    # 解析每个股票的字段
+                    result = []
+                    for item in items:
+                        parsed = parse_eastmoney_data(item, STOCK_LIST_FIELDS)
+                        result.append(parsed)
+                    return result
 
-            return None
-        except Exception as e:
-            print(f"获取所有股票失败: {e}")
-            return None
+                return None
+            except Exception as e:
+                print(f"获取所有股票失败: {e}")
+                retry_count += 1
+                continue
+        
+        return None
 
     def get_index_data(self, secid: str) -> Optional[Dict]:
         """获取指数数据"""
@@ -246,10 +266,28 @@ class EastmoneyAPI:
             print(f"获取指数数据失败: {e}")
             return None
 
-    def get_sectors(self, page_size: int = 100) -> Optional[List]:
-        """获取板块数据"""
+    def get_sectors(self, page_size: int = 100, sector_type: str = 'concept') -> Optional[List]:
+        """获取板块数据
+        
+        Args:
+            page_size: 每页数量
+            sector_type: 板块类型: 'industry' (行业), 'concept' (概念), 'region' (地域)
+            
+        Returns:
+            板块数据列表
+        """
         try:
             url = f'{self.BASE_URL}/qt/clist/get'
+            
+            # 根据板块类型选择参数
+            sector_map = {
+                'industry': 'm:90+t:1',  # 行业板块
+                'concept': 'm:90+t:2',    # 概念板块
+                'region': 'm:90+t:3'      # 地域板块
+            }
+            
+            fs_param = sector_map.get(sector_type, 'm:90+t:2')  # 默认概念板块
+            
             params = {
                 'pn': 1,
                 'pz': page_size,
@@ -259,15 +297,18 @@ class EastmoneyAPI:
                 'fltt': 2,
                 'invt': 2,
                 'fid': 'f3',
-                'fs': 'm:90+t:2',
-                'fields': 'f12,f14,f3'
+                'fs': fs_param,
+                'fields': 'f12,f14,f3,f2,f4,f5,f6,f8,f10,f15,f16,f17,f18'
             }
 
-            data = self._make_request(url, params)
-            if data and 'diff' in data:
+            response = self.session.get(url, params=params, timeout=self.DEFAULT_TIMEOUT)
+            data = response.json()
+            
+            if data and 'data' in data and 'diff' in data['data']:
+                items = data['data']['diff']
                 # 解析板块数据
                 result = []
-                for item in data['diff']:
+                for item in items:
                     parsed = parse_eastmoney_data(item, SECTOR_FIELDS)
                     result.append(parsed)
                 return result
