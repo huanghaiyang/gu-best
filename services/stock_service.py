@@ -79,34 +79,6 @@ class StockService:
                 stocks = self._search_by_code(query)
             else:
                 stocks = self._search_by_name(query)
-
-            # 如果搜索成功，使用_get_real_stock_quote获取股价数据
-            if stocks:
-                updated_stocks = []
-                for stock in stocks:
-                    try:
-                        # 使用_get_real_stock_quote获取股价数据
-                        quote = self._get_real_stock_quote(stock['code'])
-
-                        # 更新股票数据
-                        stock.update({
-                            'price': quote.get('price', 0),
-                            'change': quote.get('change', 0),
-                            'change_pct': quote.get('change_pct', 0),
-                            'volume': quote.get('volume', 0),
-                            'amount': quote.get('amount', 0),
-                            'volume_ratio': 0,
-                            'turnover_rate': 0,
-                            'market_cap': quote.get('market_cap', 0),
-                            'market': get_market_label(stock['code'])
-                        })
-                    except Exception as e:
-                        print(f"获取股票股价数据失败: {e}")
-
-                    updated_stocks.append(stock)
-
-                return updated_stocks
-
             return stocks
         except Exception as e:
             print(f"搜索股票失败: {e}")
@@ -117,15 +89,10 @@ class StockService:
         try:
             # 直接调用 get_stock_quote 获取股票信息
             quote = self.eastmoney_api.get_stock_quote(code)
-            
-            if quote and quote.get('code'):
-                return [{
-                    'code': quote.get('code'),
-                    'name': quote.get('name', ''),
-                    'market': get_market_label(code)
-                }]
-            
-            return []
+            if quote:
+                return [quote]
+            else:
+                return []
         except Exception as e:
             print(f"通过代码搜索股票失败: {e}")
             return []
@@ -194,8 +161,8 @@ class StockService:
                     'price': item.get('price', 0),
                     'change_pct': item.get('change_pct', 0),
                     'change': item.get('change', 0),
-                    'volume': item.get('volume', 0) / 10000,  # 转换为万手
-                    'amount': item.get('amount', 0) / 100000000,  # 转换为亿
+                    'volume': item.get('volume', 0),  # 转换为万手
+                    'amount': item.get('amount', 0),  # 转换为亿
                     'volume_ratio': item.get('volume_ratio', 0),
                     'turnover_rate': item.get('turnover_rate', 0),
                     'market_cap': item.get('market_cap', 0),
@@ -238,8 +205,8 @@ class StockService:
                                 'price': price,
                                 'change_pct': change_pct,
                                 'change': item.get('change', 0),
-                                'volume': item.get('volume', 0) / 10000,  # 转换为万手
-                                'amount': item.get('amount', 0) / 100000000,  # 转换为亿
+                                'volume': item.get('volume', 0),  # 转换为万手
+                                'amount': item.get('amount', 0),  # 转换为亿
                                 'volume_ratio': item.get('volume_ratio', 0),
                                 'turnover_rate': item.get('turnover_rate', 0),
                                 'market_cap': item.get('market_cap', 0),
@@ -486,9 +453,9 @@ class StockService:
                 'price': item.get('price', 0),
                 'change': item.get('change', 0),
                 'change_pct': item.get('change_pct', 0),
-                'volume': item.get('volume_shares', 0) / 100,  # 转换为万股
-                'amount': item.get('amount_yuan', 0) / 100000000,  # 转换为亿元
-                'market_cap': item.get('market_cap', 0) / 100000000  # 转换为亿元
+                'volume': item.get('volume', 0),
+                'amount': item.get('amount', 0),
+                'market_cap': item.get('market_cap', 0)
             }
 
         return self._get_empty_quote(stock_code)

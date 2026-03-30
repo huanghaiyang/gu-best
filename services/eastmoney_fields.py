@@ -24,22 +24,19 @@ STOCK_QUOTE_FIELDS = {
     'f58': {'name': 'name', 'desc': '股票名称', 'unit': None},
 
     # 价格信息 (需要除以100)
-    'f43': {'name': 'price', 'desc': '最新价', 'unit': '元', 'divisor': 100},
-    'f44': {'name': 'open', 'desc': '开盘价', 'unit': '元', 'divisor': 100},
-    'f45': {'name': 'high', 'desc': '最高价', 'unit': '元', 'divisor': 100},
-    'f46': {'name': 'low', 'desc': '最低价', 'unit': '元', 'divisor': 100},
+    'f43': {'name': 'price', 'desc': '最新价', 'unit': '元', 'divisor': 1},
+    'f44': {'name': 'open', 'desc': '开盘价', 'unit': '元', 'divisor': 1},
+    'f45': {'name': 'high', 'desc': '最高价', 'unit': '元', 'divisor': 1},
+    'f46': {'name': 'low', 'desc': '最低价', 'unit': '元', 'divisor': 1},
     'f47': {'name': 'volume', 'desc': '成交量(股)', 'unit': '股', 'divisor': 1},
     'f48': {'name': 'amount', 'desc': '成交额(元)', 'unit': '元', 'divisor': 1},
 
     # 涨跌信息 (需要除以100)
-    'f169': {'name': 'change', 'desc': '涨跌额', 'unit': '元', 'divisor': 100},
-    'f170': {'name': 'change_pct', 'desc': '涨跌幅', 'unit': '%', 'divisor': 100},
-
-    # 成交量相关 (注意: f152在休市时可能返回错误数据)
-    'f152': {'name': 'volume_shares', 'desc': '成交量(股)', 'unit': '股', 'divisor': 1},
+    'f169': {'name': 'change', 'desc': '涨跌额', 'unit': '元', 'divisor': 1},
+    'f170': {'name': 'change_pct', 'desc': '涨跌幅', 'unit': '%', 'divisor': 1},
 
     # 成交额 (原始单位：元)
-    'f103': {'name': 'amount_yuan', 'desc': '成交额', 'unit': '元', 'divisor': 1},
+    'f103': {'name': 'amount', 'desc': '成交额', 'unit': '元', 'divisor': 1},
 
     # 市值 (原始单位：元)
     'f116': {'name': 'market_cap', 'desc': '总市值', 'unit': '元', 'divisor': 1},
@@ -103,11 +100,11 @@ STOCK_DETAIL_FIELDS = {
     'f117': {'name': 'float_market_cap', 'desc': '流通市值', 'unit': '元', 'divisor': 1},
 
     # 估值指标 (需要除以100)
-    'f162': {'name': 'pe_ratio', 'desc': '市盈率(静)', 'unit': '倍', 'divisor': 100},
-    'f167': {'name': 'pb_ratio', 'desc': '市净率', 'unit': '倍', 'divisor': 100},
-    'f92': {'name': 'roe', 'desc': '净资产收益率', 'unit': '%', 'divisor': 100},
-    'f173': {'name': 'eps', 'desc': '每股收益', 'unit': '元', 'divisor': 100},
-    'f187': {'name': 'bps', 'desc': '每股净资产', 'unit': '元', 'divisor': 100},
+    'f162': {'name': 'pe_ratio', 'desc': '市盈率(静)', 'unit': '倍', 'divisor': 1},
+    'f167': {'name': 'pb_ratio', 'desc': '市净率', 'unit': '倍', 'divisor': 1},
+    'f92': {'name': 'roe', 'desc': '净资产收益率', 'unit': '%', 'divisor': 1},
+    'f173': {'name': 'eps', 'desc': '每股收益', 'unit': '元', 'divisor': 1},
+    'f187': {'name': 'bps', 'desc': '每股净资产', 'unit': '元', 'divisor': 1},
 
     # 财务数据 (原始单位：元)
     'f105': {'name': 'revenue', 'desc': '营业收入', 'unit': '元', 'divisor': 1},
@@ -242,7 +239,7 @@ parsed_data = parse_eastmoney_data(raw_data, STOCK_QUOTE_FIELDS)
 #     'price': 1416.02,  # 141602 / 100
 #     'change': 14.84,   # 1484 / 100
 #     'change_pct': 1.06, # 106 / 100
-#     'amount_yuan': 86239108106.25,
+#     'amount': 86239108106.25,
 #     'market_cap': 1773239669844.3
 # }
 

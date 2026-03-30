@@ -815,11 +815,19 @@ const getMarketClass = (code) => {
 };
 
 const formatVolume = (volume) => {
-    return parseFloat(volume).toFixed(4);
+    if (volume === undefined || volume === null) return '-';
+
+    const value = parseFloat(volume);
+    if (isNaN(value)) return '-';
+    return (value / 10000).toFixed(2);
 };
 
 const formatAmount = (amount) => {
-    return parseFloat(amount).toFixed(4);
+    if (amount === undefined || amount === null) return '-';
+
+    const value = parseFloat(amount);
+    if (isNaN(value)) return '-';
+    return (value / 100000000).toFixed(2);
 };
 
 const formatMarketCap = (market_cap) => {
