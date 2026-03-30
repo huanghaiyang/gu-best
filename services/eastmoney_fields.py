@@ -24,19 +24,16 @@ STOCK_QUOTE_FIELDS = {
     'f58': {'name': 'name', 'desc': '股票名称', 'unit': None},
 
     # 价格信息 (需要除以100)
-    'f43': {'name': 'price', 'desc': '最新价', 'unit': '元', 'divisor': 1},
-    'f44': {'name': 'open', 'desc': '开盘价', 'unit': '元', 'divisor': 1},
-    'f45': {'name': 'high', 'desc': '最高价', 'unit': '元', 'divisor': 1},
-    'f46': {'name': 'low', 'desc': '最低价', 'unit': '元', 'divisor': 1},
+    'f43': {'name': 'price', 'desc': '最新价', 'unit': '元', 'divisor': 100},
+    'f44': {'name': 'open', 'desc': '开盘价', 'unit': '元', 'divisor': 100},
+    'f45': {'name': 'high', 'desc': '最高价', 'unit': '元', 'divisor': 100},
+    'f46': {'name': 'low', 'desc': '最低价', 'unit': '元', 'divisor': 100},
     'f47': {'name': 'volume', 'desc': '成交量(股)', 'unit': '股', 'divisor': 1},
     'f48': {'name': 'amount', 'desc': '成交额(元)', 'unit': '元', 'divisor': 1},
 
     # 涨跌信息 (需要除以100)
-    'f169': {'name': 'change', 'desc': '涨跌额', 'unit': '元', 'divisor': 1},
-    'f170': {'name': 'change_pct', 'desc': '涨跌幅', 'unit': '%', 'divisor': 1},
-
-    # 成交额 (原始单位：元)
-    'f103': {'name': 'amount', 'desc': '成交额', 'unit': '元', 'divisor': 1},
+    'f169': {'name': 'change', 'desc': '涨跌额', 'unit': '元', 'divisor': 100},
+    'f170': {'name': 'change_pct', 'desc': '涨跌幅', 'unit': '%', 'divisor': 100},
 
     # 市值 (原始单位：元)
     'f116': {'name': 'market_cap', 'desc': '总市值', 'unit': '元', 'divisor': 1},
@@ -196,7 +193,7 @@ def parse_eastmoney_data(data: Dict, field_mapping: Dict) -> Dict:
 
 # 实时行情常用字段
 QUOTE_FIELDS_BASIC = 'f57,f58,f43,f169,f170'  # 代码、名称、价格、涨跌额、涨跌幅
-QUOTE_FIELDS_FULL = 'f57,f58,f43,f44,f45,f46,f169,f170,f103,f116,f152'  # 完整行情
+QUOTE_FIELDS_FULL = 'f57,f58,f43,f44,f45,f46,f47,f48,f169,f170,f116,f152'  # 完整行情
 
 # 列表查询常用字段
 LIST_FIELDS_BASIC = 'f12,f14,f2,f3,f4'  # 代码、名称、价格、涨跌幅、涨跌额

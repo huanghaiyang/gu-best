@@ -65,12 +65,7 @@ const clearSearch = () => {
                 <p class="mt-2 text-muted">正在查询...</p>
             </div>
 
-            <div v-else-if="searchQuery && !loading" class="text-muted text-center py-4">
-                <i class="bi bi-search" style="font-size: 3rem;"></i>
-                <p class="mt-2">点击查询按钮搜索股票</p>
-            </div>
-
-            <div v-else class="text-muted text-center py-4">
+            <div v-if="!searchQuery" class="text-muted text-center py-4">
                 <i class="bi bi-search" style="font-size: 3rem;"></i>
                 <p class="mt-2">输入股票名称或代码进行查询</p>
             </div>

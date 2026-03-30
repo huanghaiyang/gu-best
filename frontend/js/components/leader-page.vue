@@ -163,10 +163,10 @@ defineExpose({
                     <div class="col-md-3" v-for="(idx, key) in indexData" :key="key">
                         <div class="index-card" :class="idx.change_pct >= 0 ? 'up' : 'down'">
                             <div class="index-name">{{ idx.name }}</div>
-                            <div class="index-price">{{ (idx.price / 100).toFixed(2) }}</div>
+                            <div class="index-price">{{ (idx.price).toFixed(2) }}</div>
                             <div class="index-change">
-                                <span>{{ idx.change >= 0 ? '+' : '' }}{{ (idx.change / 100).toFixed(2) }}</span>
-                                <span class="ms-2">{{ idx.change_pct >= 0 ? '+' : '' }}{{ (idx.change_pct / 100).toFixed(2) }}%</span>
+                                <span>{{ idx.change >= 0 ? '+' : '' }}{{ (idx.change).toFixed(2) }}</span>
+                                <span class="ms-2">{{ idx.change_pct >= 0 ? '+' : '' }}{{ (idx.change_pct).toFixed(2) }}%</span>
                             </div>
                         </div>
                     </div>
