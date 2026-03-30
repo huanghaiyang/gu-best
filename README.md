@@ -49,9 +49,9 @@ npm install
 BASE_URL = 'http://push2.eastmoney.com/api'
 
 # API访问令牌
-UT_TOKEN_STOCK = 'fa5fd1943c7b386f172d6893dbfba10b'
-UT_TOKEN_LIST = 'bd1d9ddb04089700cf9c27f6f7426281'
-SEARCH_TOKEN = 'd41d8cd98f00b204e9800998ecf8427e'
+UT_TOKEN_STOCK = ''  # 股票实时行情令牌
+UT_TOKEN_LIST = ''  # 股票列表令牌
+SEARCH_TOKEN = ''  # 搜索令牌
 
 # 超时设置（秒）
 DEFAULT_TIMEOUT = 10
