@@ -51,3 +51,6 @@ data/
 
 # 密钥文件
 eastmoney_keys.py
+
+# 依赖包
+deps/

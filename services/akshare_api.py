@@ -1,9 +1,11 @@
+import time
 from typing import Dict, List, Optional
 from services.stock_data_provider import StockDataProvider
 
 # 尝试导入akshare
 try:
     import akshare as ak
+    import pandas as pd
     AKSHARE_AVAILABLE = True
 except ImportError:
     print("警告: akshare模块未安装，akshare数据源将不可用")
@@ -38,7 +40,7 @@ class AkshareAPI(StockDataProvider):
                 'name': data['名称'],
                 'price': data['最新价'],
                 'change': data['涨跌额'],
-                'change_pct': data['涨跌幅'] * 100,  # 转换为百分比
+                'change_pct': data['涨跌幅'],  # 转换为百分比
                 'volume': data['成交量'],
                 'amount': data['成交额'],
                 'open': data['开盘价'],
@@ -138,7 +140,7 @@ class AkshareAPI(StockDataProvider):
                     'code': row['代码'],
                     'name': row['名称'],
                     'price': row['最新价'],
-                    'change_pct': row['涨跌幅'] * 100,
+                    'change_pct': row['涨跌幅'],
                     'change': row['涨跌额'],
                     'volume': row['成交量'],
                     'amount': row['成交额'],
@@ -157,71 +159,94 @@ class AkshareAPI(StockDataProvider):
         if not AKSHARE_AVAILABLE:
             print("akshare未安装，无法获取板块数据")
             return None
-            
+
         try:
             print(f"尝试获取{sector_type}类型板块数据...")
-            
-            # 尝试使用不同的函数名获取板块数据
+
             if sector_type == 'concept':
-                # 概念板块
+                # 概念板块 - 使用摘要接口获取涨跌幅等实时数据
                 try:
-                    df = ak.stock_board_concept_name_ths()
-                    print(f"使用stock_board_concept_name_ths成功获取概念板块数据，共{len(df)}条")
-                except AttributeError:
-                    try:
-                        df = ak.stock_board_concept_index_ths()
-                        print(f"使用stock_board_concept_index_ths成功获取概念板块数据，共{len(df)}条")
-                    except Exception as e:
-                        print(f"获取概念板块数据失败: {e}")
-                        return None
+                    df = ak.stock_board_concept_summary_ths()
+                    print(f"使用stock_board_concept_summary_ths成功获取概念板块数据，共{len(df)}条")
+                    print(f"数据列: {list(df.columns)}")
+
+                    # 检查是否有涨跌幅字段
+                    if '涨跌幅' in df.columns:
+                        change_pct_col = '涨跌幅'
+                    else:
+                        change_pct_col = None
+                        print("警告: 概念板块数据缺少涨跌幅字段")
+
+                    result = []
+                    for _, row in df.head(page_size).iterrows():
+                        result.append({
+                            'code': row.get('概念名称', ''),
+                            'name': row.get('概念名称', ''),
+                            'change_pct': float(row[change_pct_col]) if change_pct_col and pd.notna(row.get(change_pct_col)) else 0,
+                            'price': 0,
+                            'change': 0,
+                            'volume': 0,
+                            'amount': 0,
+                            'turnover_rate': 0,
+                            'volume_ratio': 0
+                        })
+                    return result
+
+                except Exception as e:
+                    print(f"获取概念板块数据失败: {e}")
+                    return None
+
             elif sector_type == 'industry':
-                # 行业板块
+                # 行业板块 - 使用摘要接口获取涨跌幅等实时数据
                 try:
-                    df = ak.stock_board_industry_name_ths()
-                    print(f"使用stock_board_industry_name_ths成功获取行业板块数据，共{len(df)}条")
-                except AttributeError:
-                    try:
-                        df = ak.stock_board_industry_index_ths()
-                        print(f"使用stock_board_industry_index_ths成功获取行业板块数据，共{len(df)}条")
-                    except Exception as e:
-                        print(f"获取行业板块数据失败: {e}")
-                        return None
+                    df = ak.stock_board_industry_summary_ths()
+                    print(f"使用stock_board_industry_summary_ths成功获取行业板块数据，共{len(df)}条")
+                    print(f"数据列: {list(df.columns)}")
+
+                    result = []
+                    for _, row in df.head(page_size).iterrows():
+                        result.append({
+                            'code': row.get('板块', ''),
+                            'name': row.get('板块', ''),
+                            'change_pct': float(row['涨跌幅']) if '涨跌幅' in df.columns and pd.notna(row.get('涨跌幅')) else 0,
+                            'price': 0,
+                            'change': 0,
+                            'volume': float(row['总成交量']) if '总成交量' in df.columns and pd.notna(row.get('总成交量')) else 0,
+                            'amount': float(row['总成交额']) if '总成交额' in df.columns and pd.notna(row.get('总成交额')) else 0,
+                            'turnover_rate': 0,
+                            'volume_ratio': 0
+                        })
+                    return result
+
+                except Exception as e:
+                    print(f"获取行业板块数据失败: {e}")
+                    return None
+
             else:
                 # 地域板块
                 try:
                     df = ak.stock_board_area_name_ths()
                     print(f"使用stock_board_area_name_ths成功获取地域板块数据，共{len(df)}条")
+
+                    result = []
+                    for _, row in df.head(page_size).iterrows():
+                        result.append({
+                            'code': row.get('code', ''),
+                            'name': row.get('name', ''),
+                            'change_pct': 0,
+                            'price': 0,
+                            'change': 0,
+                            'volume': 0,
+                            'amount': 0,
+                            'turnover_rate': 0,
+                            'volume_ratio': 0
+                        })
+                    return result
+
                 except Exception as e:
                     print(f"获取地域板块数据失败: {e}")
                     return None
-            
-            # 检查数据是否为空
-            if df.empty:
-                print(f"获取{sector_type}类型板块数据为空")
-                return None
-            
-            # 检查数据列是否存在
-            if '代码' not in df.columns or '名称' not in df.columns:
-                print(f"数据列不完整，缺少必要字段")
-                print(f"实际列: {list(df.columns)}")
-                return None
-            
-            result = []
-            for _, row in df.head(page_size).iterrows():
-                result.append({
-                    'code': row['代码'],
-                    'name': row['名称'],
-                    'change_pct': 0,  # 需要额外获取
-                    'price': 0,  # 板块指数
-                    'change': 0,  # 涨跌额
-                    'volume': 0,  # 成交量
-                    'amount': 0,  # 成交额
-                    'turnover_rate': 0,  # 换手率
-                    'volume_ratio': 0  # 量比
-                })
-            
-            print(f"成功处理{len(result)}个板块数据")
-            return result
+
         except Exception as e:
             print(f"获取板块数据失败: {e}")
             import traceback
@@ -309,8 +334,9 @@ class AkshareAPI(StockDataProvider):
             else:
                 return None
             
-            # 使用akshare获取指数数据
-            df = ak.stock_zh_index_spot_em()
+            # 使用akshare获取指数数据，使用sina接口
+            df = ak.stock_zh_index_spot_sina()
+            
             index_data = df[df['代码'] == ak_code]
             
             if index_data.empty:
@@ -322,7 +348,7 @@ class AkshareAPI(StockDataProvider):
                 'name': data['名称'],
                 'price': data['最新价'],
                 'change': data['涨跌额'],
-                'change_pct': data['涨跌幅'] * 100
+                'change_pct': data['涨跌幅']
             }
         except Exception as e:
             print(f"获取指数数据失败: {e}")
