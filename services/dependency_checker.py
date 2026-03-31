@@ -22,12 +22,23 @@ def check_python_version() -> Tuple[bool, str]:
 def check_akshare() -> Tuple[bool, str]:
     """检查akshare模块"""
     try:
-        import akshare as ak
-        return True, f"akshare {ak.__version__} ✓"
+        # 使用subprocess检查akshare是否安装，避免导入mini_racer
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, "-c", "import akshare; print(akshare.__version__)"],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        if result.returncode == 0:
+            version = result.stdout.strip()
+            return True, f"akshare {version} ✓"
+        else:
+            return False, "akshare 未安装 ✗"
     except ImportError:
         return False, "akshare 未安装 ✗"
     except Exception as e:
-        return False, f"akshare 安装异常: {e} ✗"
+        return False, f"akshare 检查异常: {e} ✗"
 
 
 def check_eastmoney_keys() -> Tuple[bool, str]:

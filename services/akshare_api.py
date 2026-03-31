@@ -1,4 +1,5 @@
 import time
+import asyncio
 from typing import Dict, List, Optional
 from services.stock_data_provider import StockDataProvider
 
@@ -15,7 +16,7 @@ except ImportError:
 class AkshareAPI(StockDataProvider):
     """Akshare API封装"""
     
-    def get_stock_quote(self, code: str) -> Optional[Dict]:
+    async def get_stock_quote(self, code: str) -> Optional[Dict]:
         """获取股票实时行情"""
         if not AKSHARE_AVAILABLE:
             print("akshare未安装，无法获取股票实时行情")
@@ -28,7 +29,7 @@ class AkshareAPI(StockDataProvider):
                 return None
             
             # 使用akshare获取实时行情
-            df = ak.stock_zh_a_spot_em()
+            df = await asyncio.to_thread(ak.stock_zh_a_spot_em)
             stock_data = df[df['代码'] == ak_code]
             
             if stock_data.empty:
@@ -52,7 +53,7 @@ class AkshareAPI(StockDataProvider):
             print(f"获取股票实时行情失败: {e}")
             return None
     
-    def get_stock_detail(self, code: str) -> Optional[Dict]:
+    async def get_stock_detail(self, code: str) -> Optional[Dict]:
         """获取股票详细信息"""
         if not AKSHARE_AVAILABLE:
             print("akshare未安装，无法获取股票详细信息")
@@ -65,7 +66,7 @@ class AkshareAPI(StockDataProvider):
                 return None
             
             # 使用akshare获取股票基本信息
-            df = ak.stock_zh_a_basic()
+            df = await asyncio.to_thread(ak.stock_zh_a_basic)
             stock_data = df[df['代码'] == ak_code]
             
             if stock_data.empty:
@@ -83,7 +84,7 @@ class AkshareAPI(StockDataProvider):
             print(f"获取股票详细信息失败: {e}")
             return None
     
-    def get_sector_stocks(self, sector_code: str, page_size: int = 100) -> Optional[List]:
+    async def get_sector_stocks(self, sector_code: str, page_size: int = 100) -> Optional[List]:
         """获取板块成分股"""
         if not AKSHARE_AVAILABLE:
             print("akshare未安装，无法获取板块成分股")
@@ -91,14 +92,14 @@ class AkshareAPI(StockDataProvider):
             
         try:
             # 使用akshare获取概念板块成分股
-            df = ak.stock_board_concept_name_ths()
+            df = await asyncio.to_thread(ak.stock_board_concept_name_ths)
             sector_data = df[df['代码'] == sector_code]
             
             if sector_data.empty:
                 return None
             
             sector_name = sector_data.iloc[0]['名称']
-            stocks_df = ak.stock_board_concept_cons_ths(sector_name=sector_name)
+            stocks_df = await asyncio.to_thread(ak.stock_board_concept_cons_ths, sector_name=sector_name)
             
             result = []
             for _, row in stocks_df.head(page_size).iterrows():
@@ -114,7 +115,7 @@ class AkshareAPI(StockDataProvider):
             print(f"获取板块成分股失败: {e}")
             return None
     
-    def get_all_stocks(self, fs: str, page_size: int = 500) -> Optional[List]:
+    async def get_all_stocks(self, fs: str, page_size: int = 500) -> Optional[List]:
         """获取所有股票"""
         if not AKSHARE_AVAILABLE:
             print("akshare未安装，无法获取所有股票")
@@ -122,7 +123,7 @@ class AkshareAPI(StockDataProvider):
             
         try:
             # 使用akshare获取A股列表
-            df = ak.stock_zh_a_spot_em()
+            df = await asyncio.to_thread(ak.stock_zh_a_spot_em)
             
             # 根据fs参数过滤
             if 'm:0+t:6' in fs:  # 深主板
@@ -154,7 +155,7 @@ class AkshareAPI(StockDataProvider):
             print(f"获取所有股票失败: {e}")
             return None
     
-    def get_sectors(self, page_size: int = 100, sector_type: str = 'concept') -> Optional[List]:
+    async def get_sectors(self, page_size: int = 100, sector_type: str = 'concept') -> Optional[List]:
         """获取板块数据"""
         if not AKSHARE_AVAILABLE:
             print("akshare未安装，无法获取板块数据")
@@ -166,7 +167,7 @@ class AkshareAPI(StockDataProvider):
             if sector_type == 'concept':
                 # 概念板块 - 使用摘要接口获取涨跌幅等实时数据
                 try:
-                    df = ak.stock_board_concept_summary_ths()
+                    df = await asyncio.to_thread(ak.stock_board_concept_summary_ths)
                     print(f"使用stock_board_concept_summary_ths成功获取概念板块数据，共{len(df)}条")
                     print(f"数据列: {list(df.columns)}")
 
@@ -199,7 +200,7 @@ class AkshareAPI(StockDataProvider):
             elif sector_type == 'industry':
                 # 行业板块 - 使用摘要接口获取涨跌幅等实时数据
                 try:
-                    df = ak.stock_board_industry_summary_ths()
+                    df = await asyncio.to_thread(ak.stock_board_industry_summary_ths)
                     print(f"使用stock_board_industry_summary_ths成功获取行业板块数据，共{len(df)}条")
                     print(f"数据列: {list(df.columns)}")
 
@@ -225,7 +226,7 @@ class AkshareAPI(StockDataProvider):
             else:
                 # 地域板块
                 try:
-                    df = ak.stock_board_area_name_ths()
+                    df = await asyncio.to_thread(ak.stock_board_area_name_ths)
                     print(f"使用stock_board_area_name_ths成功获取地域板块数据，共{len(df)}条")
 
                     result = []
@@ -253,7 +254,7 @@ class AkshareAPI(StockDataProvider):
             traceback.print_exc()
             return None
     
-    def search_stocks(self, name: str) -> List[Dict]:
+    async def search_stocks(self, name: str) -> List[Dict]:
         """搜索股票"""
         if not AKSHARE_AVAILABLE:
             print("akshare未安装，无法搜索股票")
@@ -261,7 +262,7 @@ class AkshareAPI(StockDataProvider):
             
         try:
             # 使用akshare获取股票列表
-            df = ak.stock_zh_a_spot_em()
+            df = await asyncio.to_thread(ak.stock_zh_a_spot_em)
             # 搜索代码或名称包含关键字的股票
             result_df = df[df['代码'].str.contains(name) | df['名称'].str.contains(name)]
             
@@ -277,7 +278,7 @@ class AkshareAPI(StockDataProvider):
             print(f"搜索股票失败: {e}")
             return []
     
-    def get_stock_history(self, code: str, start_date: str, end_date: str) -> Optional[List]:
+    async def get_stock_history(self, code: str, start_date: str, end_date: str) -> Optional[List]:
         """获取股票历史数据"""
         if not AKSHARE_AVAILABLE:
             print("akshare未安装，无法获取股票历史数据")
@@ -290,7 +291,8 @@ class AkshareAPI(StockDataProvider):
                 return None
             
             # 使用akshare获取历史数据
-            df = ak.stock_zh_a_hist(
+            df = await asyncio.to_thread(
+                ak.stock_zh_a_hist,
                 symbol=ak_code,
                 period="daily",
                 start_date=start_date,
@@ -315,7 +317,7 @@ class AkshareAPI(StockDataProvider):
             print(f"获取股票历史数据失败: {e}")
             return None
     
-    def get_index_data(self, secid: str) -> Optional[Dict]:
+    async def get_index_data(self, secid: str) -> Optional[Dict]:
         """获取指数数据"""
         if not AKSHARE_AVAILABLE:
             print("akshare未安装，无法获取指数数据")
@@ -335,7 +337,7 @@ class AkshareAPI(StockDataProvider):
                 return None
             
             # 使用akshare获取指数数据，使用sina接口
-            df = ak.stock_zh_index_spot_sina()
+            df = await asyncio.to_thread(ak.stock_zh_index_spot_sina)
             
             index_data = df[df['代码'] == ak_code]
             

@@ -1,4 +1,6 @@
-from flask import Flask, jsonify, request, send_from_directory, g
+import inspect
+from functools import wraps
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from services.stock_service import StockService
 from services.ai_service import AIService
@@ -34,19 +36,24 @@ CORS(app,
 db_service = DatabaseService()
 ai_service = AIService()
 
-# 从数据库获取默认数据源
-default_data_source = db_service.get_setting('dataSource') or 'akshare'
+# 从数据库获取默认数据源，默认使用eastmoney避免akshare的mini_racer问题
+default_data_source = db_service.get_setting('dataSource') or 'eastmoney'
 
-# 尝试创建StockService，如果akshare不可用则使用eastmoney
+# 尝试创建StockService，如果失败则使用备用数据源
 try:
     stock_service = StockService(provider_type=default_data_source)
 except Exception as e:
     print(f"创建StockService失败: {e}")
-    print("尝试使用eastmoney作为数据源")
-    stock_service = StockService(provider_type='eastmoney')
+    print("尝试使用备用数据源")
+    try:
+        stock_service = StockService(provider_type='eastmoney')
+    except Exception as e2:
+        print(f"备用数据源也失败: {e2}")
+        raise
 
 def csrf_protected(f):
-    """CSRF保护装饰器"""
+    """CSRF保护装饰器（支持同步和异步函数）"""
+    @wraps(f)
     def decorated_function(*args, **kwargs):
         # GET请求不需要CSRF保护
         if request.method == 'GET':
@@ -66,7 +73,29 @@ def csrf_protected(f):
         
         return f(*args, **kwargs)
     
-    decorated_function.__name__ = f.__name__
+    @wraps(f)
+    async def async_decorated_function(*args, **kwargs):
+        # GET请求不需要CSRF保护
+        if request.method == 'GET':
+            return await f(*args, **kwargs)
+        
+        # 从请求头获取CSRF令牌
+        token = request.headers.get('X-CSRF-Token')
+        if not token:
+            # 从请求体获取CSRF令牌
+            data = request.get_json(silent=True) or {}
+            token = data.get('csrf_token')
+        
+        # 使用会话ID作为用户标识符
+        session_id = request.cookies.get('session_id', 'anonymous')
+        if not token or not csrf_service.validate_token(token, session_id):
+            return jsonify({'success': False, 'error': 'CSRF令牌无效或已过期'}), 403
+        
+        return await f(*args, **kwargs)
+    
+    # 根据被装饰函数是否为协程函数返回相应的装饰器
+    if inspect.iscoroutinefunction(f):
+        return async_decorated_function
     return decorated_function
 
 @app.route('/')
@@ -94,15 +123,15 @@ def health_check():
     return jsonify({'status': 'ok', 'message': '服务运行正常'})
 
 @app.route('/api/stocks/sectors', methods=['GET'])
-def get_sectors():
+async def get_sectors():
     try:
-        sectors = stock_service.get_sectors()
+        sectors = await stock_service.get_sectors()
         return jsonify({'success': True, 'data': sectors})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/stocks/search', methods=['GET'])
-def search_stocks():
+async def search_stocks():
     try:
         query = request.args.get('query', '').strip()
         
@@ -113,21 +142,21 @@ def search_stocks():
         # 清理输入
         sanitized_query = security_service.sanitize_input(query)
         
-        stocks = stock_service.search_stocks(sanitized_query)
+        stocks = await stock_service.search_stocks(sanitized_query)
         return jsonify({'success': True, 'data': stocks})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/stocks/index', methods=['GET'])
-def get_index_data():
+async def get_index_data():
     try:
-        index_data = stock_service.get_index_data()
+        index_data = await stock_service.get_index_data()
         return jsonify({'success': True, 'data': index_data})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/stocks/kline', methods=['GET'])
-def get_kline_data():
+async def get_kline_data():
     try:
         code = request.args.get('code', '').strip()
         
@@ -138,13 +167,13 @@ def get_kline_data():
         # 清理输入
         sanitized_code = security_service.sanitize_input(code)
         
-        kline_data = stock_service.get_kline_data(sanitized_code)
+        kline_data = await stock_service.get_kline_data(sanitized_code)
         return jsonify({'success': True, 'data': kline_data})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/stocks/leaders', methods=['GET'])
-def get_leader_stocks():
+async def get_leader_stocks():
     try:
         sector = request.args.get('sector', None)
         top_n = request.args.get('top_n', stock_filter_config['top_n_stocks'])
@@ -160,7 +189,7 @@ def get_leader_stocks():
         if sector:
             sector = security_service.sanitize_input(sector)
         
-        leaders = stock_service.screen_leader_stocks(sector=sector, top_n=top_n)
+        leaders = await stock_service.screen_leader_stocks(sector=sector, top_n=top_n)
         return jsonify({'success': True, 'data': leaders})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -257,7 +286,7 @@ def batch_analyze_stocks():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/stocks/quote', methods=['GET'])
-def get_stock_quote():
+async def get_stock_quote():
     try:
         code = request.args.get('code', '').strip()
         
@@ -268,7 +297,7 @@ def get_stock_quote():
         # 清理输入
         sanitized_code = security_service.sanitize_input(code)
         
-        quote = stock_service.get_quote(sanitized_code)
+        quote = await stock_service.get_quote(sanitized_code)
         return jsonify({'success': True, 'data': quote})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -284,7 +313,7 @@ def get_settings():
 
 @app.route('/api/db/settings/data-source', methods=['POST'])
 @csrf_protected
-def set_data_source():
+async def set_data_source():
     try:
         data = request.get_json()
         if not data or 'dataSource' not in data:
@@ -300,7 +329,7 @@ def set_data_source():
         db_service.set_setting('dataSource', data_source)
         
         # 切换StockService的数据源
-        stock_service.set_provider(data_source)
+        await stock_service.set_provider(data_source)
         
         return jsonify({'success': True, 'data': {'dataSource': data_source}})
     except Exception as e:
